@@ -278,6 +278,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
         <button class="pill export" onclick="exportPNG()">Export PNG (1280×720)</button>
         <button class="pill" id="copy-btn" onclick="copyToClipboard()">Copy to clipboard</button>
         <button class="pill" id="drag-btn" onclick="toggleTextDrag(this)">✥ Move text</button>
+        <button class="pill" id="banner-btn" onclick="toggleBanner()">Create Banner</button>
       </div>
     </div>
   </div>
@@ -509,6 +510,8 @@ document.getElementById('file-input').addEventListener('change',function(e){
     document.getElementById('upload-zone').classList.add('has-file');
     document.getElementById('img-name').textContent=file.name;
     document.getElementById('canvas-empty').classList.add('hidden');
+    // sync to banner if open
+    if(bannerVisible) syncBannerContent();
   };
   r.readAsDataURL(file);
 });
@@ -545,6 +548,7 @@ function applyGlobalWeight(){
 function syncText(){
   thumbText.innerHTML=editor.innerHTML;
   thumbText.querySelectorAll('.thumb-size-only[data-thumb-size]').forEach(function(s){s.style.fontSize=s.dataset.thumbSize;});
+  if(typeof bannerVisible!=='undefined'&&bannerVisible) syncBannerContent();
 }
 editor.addEventListener('input',syncText);
 
@@ -774,28 +778,64 @@ async function doCapture(){
     };
   });
 
-  // Force computed px values — getComputedStyle resolves cqw, em, etc
+  // Resolve cqw/em to computed px — let html2canvas scale parameter handle the rest
   allNodes.forEach(function(n){
     var cs=window.getComputedStyle(n);
-    // fontSize: computed resolves cqw → px at current container size
-    // We then need to scale it to 1280px wide equivalent
-    var computedFS=parseFloat(cs.fontSize);
-    var scaledFS=(computedFS*scale)+'px'; // scale to export resolution
-    n.style.fontSize=scaledFS;
-    // letter-spacing: resolve em (based on font-size) then scale
-    var computedLS=parseFloat(cs.letterSpacing); // px at screen size
-    n.style.letterSpacing=(computedLS*scale)+'px';
-    // line-height: resolve and scale
-    var computedLH=cs.lineHeight;
-    if(computedLH!=='normal'){
-      n.style.lineHeight=(parseFloat(computedLH)*scale)+'px';
-    }
-    // fontFamily and fontWeight: pass through as-is (already loaded)
+    n.style.fontSize=cs.fontSize;          // resolves cqw → px
+    n.style.letterSpacing=cs.letterSpacing; // resolves em → px
+    if(cs.lineHeight!=='normal') n.style.lineHeight=cs.lineHeight;
     n.style.fontFamily=cs.fontFamily;
     n.style.fontWeight=cs.fontWeight;
+    n.style.color=cs.color;                // ensure color is explicit
   });
 
-  // Capture at scale=1 since we've already scaled font sizes
+  // Convert bg-image transform to explicit position before capture
+  // so html2canvas doesn't need to handle CSS transforms
+  var bgImg=document.getElementById('bg-image');
+  var bgWrapEl=document.getElementById('bg-wrap');
+  var savedBgStyle={
+    transform: bgImg.style.transform,
+    width: bgImg.style.width,
+    height: bgImg.style.height,
+    position: bgImg.style.position,
+    left: bgImg.style.left,
+    top: bgImg.style.top,
+    objectFit: bgImg.style.objectFit,
+    maxWidth: bgImg.style.maxWidth,
+  };
+
+  if(bgImg.classList.contains('visible')){
+    var wrapW=bgWrapEl.offsetWidth;
+    var wrapH=bgWrapEl.offsetHeight;
+    var sc=bgScale/100;
+    // Natural image dimensions
+    var natW=bgImg.naturalWidth||bgImg.offsetWidth;
+    var natH=bgImg.naturalHeight||bgImg.offsetHeight;
+    // Compute cover size (same as object-fit:cover)
+    var imgAspect=natW/natH;
+    var wrapAspect=wrapW/wrapH;
+    var displayW, displayH;
+    if(imgAspect>wrapAspect){
+      displayH=wrapH; displayW=wrapH*imgAspect;
+    } else {
+      displayW=wrapW; displayH=wrapW/imgAspect;
+    }
+    // Apply scale
+    displayW*=sc; displayH*=sc;
+    // Center + offset
+    var left=(wrapW-displayW)/2 + bgX;
+    var top=(wrapH-displayH)/2 + bgY;
+    // Apply as explicit position (no transform)
+    bgImg.style.transform='none';
+    bgImg.style.objectFit='none';
+    bgImg.style.width=displayW+'px';
+    bgImg.style.height=displayH+'px';
+    bgImg.style.position='absolute';
+    bgImg.style.left=left+'px';
+    bgImg.style.top=top+'px';
+    bgImg.style.maxWidth='none';
+  }
+
   var canvas=await html2canvas(el,{
     scale:scale,
     useCORS:true,
@@ -804,7 +844,23 @@ async function doCapture(){
     logging:false,
     letterRendering:true,
     imageTimeout:0,
+    onclone:function(doc){
+      var tt=doc.getElementById('thumb-text');
+      if(tt){tt.style.visibility='visible';tt.style.opacity='1';}
+    }
   });
+
+  // Restore bg-image styles
+  if(bgImg.classList.contains('visible')){
+    bgImg.style.transform=savedBgStyle.transform;
+    bgImg.style.width=savedBgStyle.width;
+    bgImg.style.height=savedBgStyle.height;
+    bgImg.style.position=savedBgStyle.position;
+    bgImg.style.left=savedBgStyle.left;
+    bgImg.style.top=savedBgStyle.top;
+    bgImg.style.objectFit=savedBgStyle.objectFit;
+    bgImg.style.maxWidth=savedBgStyle.maxWidth;
+  }
 
   // Restore original styles
   allNodes.forEach(function(n,i){
@@ -846,6 +902,416 @@ function startLogoDrag(e){
   e.preventDefault();
 }
 // logo drag merged into main mousemove
+</script>
+
+<style>
+/* ── BANNER SECTION ── */
+.banner-section{
+  position:relative;z-index:1;
+  max-width:1100px;margin:0 auto;
+  padding:20px 16px 32px;
+  display:none;
+}
+.banner-section.visible{display:block}
+.banner-sec-title{
+  font-family:'ArtlistSans',sans-serif;
+  font-size:calc(var(--f-sec)*1.15);font-weight:400;letter-spacing:-0.8px;
+  color:var(--t1);padding-bottom:7px;border-bottom:1px solid var(--y);
+  margin-bottom:16px;
+}
+/* Banner canvas: 300x60 display ratio — scale up for visibility */
+/* Display at 5× = 1500x300px, export at actual 300×60 */
+.banner-wrap{
+  display:flex;flex-direction:column;align-items:flex-start;gap:12px;
+}
+.banner-outer{
+  position:relative;
+  width:750px;   /* display width: 300*2.5 */
+  height:150px;  /* display height: 60*2.5 */
+  border-radius:6px;overflow:hidden;background:#000;
+  border:1px solid rgba(255,255,255,.12);
+  flex-shrink:0;cursor:default;
+}
+@media(max-width:800px){
+  .banner-outer{width:100%;height:auto;aspect-ratio:300/60}
+}
+#banner-canvas{width:100%;height:100%;position:relative;overflow:hidden;background:#000}
+/* Banner bg image */
+#banner-bg-wrap{position:absolute;inset:0;overflow:hidden}
+#banner-bg-img{
+  position:absolute;
+  height:100%;width:auto;
+  right:0;top:0;
+  pointer-events:none;
+  transform-origin:right center;
+  display:none;
+}
+#banner-bg-img.visible{display:block}
+/* Gradient overlay: left→transparent, covers left ~55% */
+#banner-gradient{
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(to right,#000 0%,#000 40%,rgba(0,0,0,0.7) 60%,transparent 100%);
+}
+/* Banner text */
+#banner-text{
+  position:absolute;
+  left:5%;top:50%;transform:translateY(-50%);
+  max-width:70%;
+  font-family:'ArtlistSans',sans-serif;font-weight:700;
+  font-size:2.8cqh;
+  color:#fff;line-height:1.2;letter-spacing:0;
+  white-space:pre-wrap;word-break:break-word;
+  pointer-events:auto;
+}
+#banner-text.dragging{cursor:grabbing}
+#banner-text:not(.is-positioned):hover{outline:1px dashed rgba(255,218,42,.4);outline-offset:4px}
+#banner-canvas{container-type:size}
+
+/* Banner controls */
+.banner-controls{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.banner-ctrl-group{display:flex;flex-direction:column;gap:5px}
+.banner-ctrl-label{font-size:10px;color:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+
+.banner-pills{display:flex;gap:6px;flex-wrap:wrap}
+</style>
+<!-- BANNER SECTION -->
+<div class="banner-section" id="banner-section">
+  <div class="banner-sec-title">Banner — 300 × 60 px</div>
+  <div class="banner-wrap">
+
+    <!-- Canvas -->
+    <div class="banner-outer" id="banner-outer">
+      <div id="banner-canvas">
+        <div id="banner-bg-wrap">
+          <img id="banner-bg-img" src="" alt="" draggable="false">
+        </div>
+        <div id="banner-gradient"></div>
+        <div id="banner-text" style="cursor:move;pointer-events:auto;user-select:none">Your title<br>goes here</div>
+      </div>
+    </div>
+
+    <!-- Banner Text Editor -->
+    <div style="display:flex;flex-direction:column;gap:5px;width:100%;max-width:750px">
+      <div class="banner-ctrl-label" style="font-size:10px;color:var(--t3);letter-spacing:.04em;text-transform:uppercase">Banner text — select to style per line</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px">
+        <select class="sz-sel" id="bt-font" onchange="applyBannerSelProp('font')">
+          <option value="">Font ▸</option>
+          <option value="ArtlistSans">Artlist Sans</option>
+          <option value="PublicoBanner">Publico</option>
+        </select>
+        <select class="sz-sel" id="bt-weight" onchange="applyBannerSelProp('weight')">
+          <option value="">Weight ▸</option>
+          <option value="300">Light</option>
+          <option value="400">Regular</option>
+          <option value="500">Medium</option>
+          <option value="700">Bold</option>
+          <option value="900">Black</option>
+        </select>
+        <select class="sz-sel" id="bt-size" onchange="applyBannerSelProp('size')">
+          <option value="">Size ▸</option>
+          <option value="1cqh">XS</option><option value="2cqh">S</option>
+          <option value="3cqh">M</option><option value="4cqh">L</option>
+          <option value="6cqh">XL</option><option value="8cqh">XXL</option>
+          <option value="12cqh">3XL</option>
+        </select>
+      </div>
+      <div id="banner-text-editor" contenteditable="true" spellcheck="false"
+        style="background:var(--card);border:1.68px solid var(--b);border-radius:var(--r);
+               color:#fff;font-family:'ArtlistSans',sans-serif;font-weight:700;font-size:13px;
+               padding:8px 10px;outline:none;min-height:44px;line-height:1.5;
+               white-space:pre-wrap;word-break:break-word;cursor:text;width:100%;max-width:750px">Your title<br>goes here</div>
+      <div style="font-size:9px;color:var(--t3)">Select text above to change font/weight/size per word or line · Drag text on canvas to reposition</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="banner-controls">
+
+      <div class="banner-ctrl-group">
+        <div class="banner-ctrl-label">Image position</div>
+        <div class="zoom-row" style="width:200px">
+          <div class="zbtn" onclick="bannerNudge('x',-3)">←</div>
+          <div class="zbtn" onclick="bannerNudge('x',3)">→</div>
+          <div class="zbtn" onclick="bannerNudge('y',-3)">↑</div>
+          <div class="zbtn" onclick="bannerNudge('y',3)">↓</div>
+          <div class="zbtn r" onclick="resetBanner()">↺</div>
+        </div>
+        <div style="font-size:10px;color:var(--t3)">Or drag image to reposition</div>
+      </div>
+
+      <div class="banner-ctrl-group">
+        <div class="banner-ctrl-label">Image scale</div>
+        <div class="zoom-row" style="width:180px">
+          <div class="zbtn" onclick="bannerZoom(-5)">−</div>
+          <input type="range" id="banner-zoom" min="50" max="300" value="100" step="1" oninput="bannerScale=parseInt(this.value);applyBannerBg()">
+          <div class="zbtn" onclick="bannerZoom(5)">+</div>
+        </div>
+      </div>
+
+      <div class="banner-ctrl-group">
+        <div class="banner-ctrl-label">Gradient reach</div>
+        <div class="zoom-row" style="width:200px">
+          <div class="zbtn" onclick="nudgeBannerCtrl('banner-grad',-5)">−</div>
+          <input type="range" id="banner-grad" min="10" max="95" value="60" step="1" oninput="updateBannerGrad()">
+          <div class="zbtn" onclick="nudgeBannerCtrl('banner-grad',5)">+</div>
+          <span id="banner-grad-val" style="font-size:11px;color:var(--t2);min-width:28px;text-align:right">60%</span>
+        </div>
+      </div>
+
+      <div class="banner-ctrl-group">
+        <div class="banner-ctrl-label">Gradient feather</div>
+        <div class="zoom-row" style="width:200px">
+          <div class="zbtn" onclick="nudgeBannerCtrl('banner-feather',-5)">−</div>
+          <input type="range" id="banner-feather" min="0" max="60" value="20" step="1" oninput="updateBannerGrad()">
+          <div class="zbtn" onclick="nudgeBannerCtrl('banner-feather',5)">+</div>
+          <span id="banner-feather-val" style="font-size:11px;color:var(--t2);min-width:28px;text-align:right">20px</span>
+        </div>
+      </div>
+
+      <div class="banner-ctrl-group">
+        <div class="banner-ctrl-label">Text size</div>
+        <div class="zoom-row" style="width:220px">
+          <div class="zbtn" onclick="bannerTextSize(-0.5)">−</div>
+          <input type="range" id="banner-text-size-range" min="0.5" max="25" value="2.8" step="0.1" oninput="bannerTextSizeFromSlider(this.value)">
+          <div class="zbtn" onclick="bannerTextSize(0.5)">+</div>
+          <span id="banner-text-size-val" style="font-size:11px;color:var(--t2);min-width:36px;text-align:right">2.8</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Export -->
+    <div class="banner-pills">
+      <button class="pill export" onclick="exportBanner()">Export Banner PNG (300×60)</button>
+      <button class="pill" id="banner-copy-btn" onclick="copyBanner()">Copy Banner</button>
+    </div>
+
+  </div>
+</div>
+<script>
+// ── BANNER ──
+var bannerVisible=false;
+var bannerX=0, bannerY=0, bannerScale=100;
+var bannerTextSizePx=2.8;
+var isBannerDrag=false, bdsx=0, bdsy=0, bdStartX=0, bdStartY=0;
+// banner text drag
+var isBannerTextDrag=false, btdsx=0, btdsy=0, btStartL=0, btStartT=0;
+
+function toggleBanner(){
+  bannerVisible=!bannerVisible;
+  document.getElementById('banner-section').classList.toggle('visible',bannerVisible);
+  var btn=document.getElementById('banner-btn');
+  btn.classList.toggle('active',bannerVisible);
+  if(bannerVisible) syncBannerContent();
+}
+
+function syncBannerContent(){
+  var mainImg=document.getElementById('bg-image');
+  var bImg=document.getElementById('banner-bg-img');
+  if(mainImg.src && mainImg.classList.contains('visible')){
+    bImg.src=mainImg.src; bImg.classList.add('visible');
+  }
+  // On first open: copy thumb text into the banner editor
+  var bEditor=document.getElementById('banner-text-editor');
+  var bannerTxt=document.getElementById('banner-text');
+  if(bEditor&&bEditor.dataset.userEdited!=='1'){
+    var tmp=document.createElement('div');
+    tmp.innerHTML=document.getElementById('thumb-text').innerHTML;
+    tmp.querySelectorAll('span').forEach(function(s){
+      var t=document.createTextNode(s.textContent);
+      s.parentNode.replaceChild(t,s);
+    });
+    bEditor.innerHTML=tmp.innerHTML;
+    bannerTxt.innerHTML=bEditor.innerHTML;
+  }
+  applyBannerBg();
+}
+
+// Banner text editor → canvas text sync
+function syncBannerText(){
+  var bEditor=document.getElementById('banner-text-editor');
+  var bannerTxt=document.getElementById('banner-text');
+  bEditor.dataset.userEdited='1';
+  bannerTxt.innerHTML=bEditor.innerHTML;
+  // apply thumb-size-only spans in canvas
+  bannerTxt.querySelectorAll('.bt-size[data-bt-size]').forEach(function(s){
+    s.style.fontSize=s.dataset.btSize;
+  });
+}
+
+// Apply selection styling in banner editor
+function applyBannerSelProp(type){
+  var selId=type==='font'?'bt-font':type==='weight'?'bt-weight':'bt-size';
+  var val=document.getElementById(selId).value; if(!val)return;
+  var bEditor=document.getElementById('banner-text-editor');
+  var sel=window.getSelection();
+  var hasSel=sel&&sel.rangeCount>0&&!sel.isCollapsed&&bEditor.contains(sel.anchorNode);
+  if(!hasSel){
+    if(type==='font'){bEditor.style.fontFamily=val;document.getElementById('banner-text').style.fontFamily=val;}
+    else if(type==='weight'){bEditor.style.fontWeight=val;document.getElementById('banner-text').style.fontWeight=val;}
+    else{document.getElementById('banner-text').style.fontSize=val;}
+    document.getElementById(selId).value='';
+    syncBannerText(); return;
+  }
+  bEditor.focus();
+  var range=sel.getRangeAt(0);
+  var span=document.createElement('span');
+  if(type==='font') span.style.fontFamily=val;
+  else if(type==='weight') span.style.fontWeight=val;
+  else { span.dataset.btSize=val; span.className='bt-size'; }
+  try{range.surroundContents(span);}catch(e){var f=range.extractContents();span.appendChild(f);range.insertNode(span);}
+  sel.removeAllRanges();
+  if(type==='size'){bEditor.querySelectorAll('.bt-size').forEach(function(s){s.style.fontSize='inherit';});}
+  document.getElementById(selId).value='';
+  syncBannerText();
+}
+
+function applyBannerBg(){
+  var img=document.getElementById('banner-bg-img');
+  img.style.height='100%';
+  img.style.width='auto';
+  img.style.right='0';
+  img.style.top='0';
+  img.style.transform='translate('+bannerX+'px,'+bannerY+'px) scale('+bannerScale/100+')';
+  img.style.transformOrigin='right center';
+}
+
+function bannerNudge(axis,delta){
+  if(axis==='x') bannerX+=delta;
+  else bannerY+=delta;
+  applyBannerBg();
+}
+function bannerZoom(delta){
+  bannerScale=Math.max(50,Math.min(300,bannerScale+delta));
+  document.getElementById('banner-zoom').value=bannerScale;
+  applyBannerBg();
+}
+function resetBanner(){
+  bannerX=0;bannerY=0;bannerScale=100;
+  document.getElementById('banner-zoom').value=100;
+  applyBannerBg();
+}
+function nudgeBannerCtrl(id,delta){
+  var el=document.getElementById(id);
+  el.value=Math.max(parseFloat(el.min),Math.min(parseFloat(el.max),parseFloat(el.value)+delta));
+  updateBannerGrad();
+}
+function updateBannerGrad(){
+  var reach=parseInt(document.getElementById('banner-grad').value);
+  var feather=parseInt(document.getElementById('banner-feather').value||20);
+  // feather: how soft the transition is (0=hard, 60=very soft)
+  var solidEnd=Math.max(0, reach - feather);
+  var fadeEnd=Math.min(100, reach + feather*0.5);
+  document.getElementById('banner-gradient').style.background=
+    'linear-gradient(to right,#000 0%,#000 '+solidEnd+'%,rgba(0,0,0,0.5) '+reach+'%,transparent '+fadeEnd+'%)';
+  // update labels
+  var gv=document.getElementById('banner-grad-val');
+  var fv=document.getElementById('banner-feather-val');
+  if(gv)gv.textContent=reach+'%';
+  if(fv)fv.textContent=feather+'px';
+}
+function bannerTextSizeFromSlider(v){
+  bannerTextSizePx=parseFloat(parseFloat(v).toFixed(1));
+  document.getElementById('banner-text').style.fontSize=bannerTextSizePx+'cqh';
+  document.getElementById('banner-text-size-val').textContent=bannerTextSizePx;
+}
+function bannerTextSize(delta){
+  bannerTextSizePx=Math.max(0.5,Math.min(25,parseFloat((bannerTextSizePx+delta).toFixed(1))));
+  var sl=document.getElementById('banner-text-size-range');
+  if(sl)sl.value=bannerTextSizePx;
+  document.getElementById('banner-text').style.fontSize=bannerTextSizePx+'cqh';
+  document.getElementById('banner-text-size-val').textContent=bannerTextSizePx;
+}
+
+// Banner drag
+var bannerOuter=document.getElementById('banner-outer');
+var bannerTextEl=document.getElementById('banner-text');
+
+// Banner text drag — track via CSS translate to avoid jump
+bannerTextEl.addEventListener('mousedown',function(e){
+  isBannerTextDrag=true;
+  btdsx=e.clientX; btdsy=e.clientY;
+  // Read current translate values (if any)
+  var curTranslate=bannerTextEl.dataset.tx?
+    {x:parseFloat(bannerTextEl.dataset.tx),y:parseFloat(bannerTextEl.dataset.ty)}:
+    {x:0,y:0};
+  btStartL=curTranslate.x;
+  btStartT=curTranslate.y;
+  e.stopPropagation(); e.preventDefault();
+});
+
+// Banner bg image drag
+bannerOuter.addEventListener('mousedown',function(e){
+  if(e.target===bannerTextEl||bannerTextEl.contains(e.target))return;
+  if(!document.getElementById('banner-bg-img').classList.contains('visible'))return;
+  isBannerDrag=true;
+  bdsx=e.clientX;bdsy=e.clientY;
+  bdStartX=bannerX;bdStartY=bannerY;
+  e.preventDefault();
+});
+document.addEventListener('mousemove',function(e){
+  if(isBannerTextDrag){
+    var pr=document.getElementById('banner-canvas').getBoundingClientRect();
+    var dx=e.clientX-btdsx;
+    var dy=e.clientY-btdsy;
+    var newTx=btStartL+dx;
+    var newTy=btStartT+dy;
+    // Clamp so text stays mostly visible
+    var maxX=pr.width*0.8;
+    var minX=-pr.width*0.3;
+    var maxY=pr.height*0.8;
+    var minY=-pr.height*0.3;
+    newTx=Math.max(minX,Math.min(maxX,newTx));
+    newTy=Math.max(minY,Math.min(maxY,newTy));
+    bannerTextEl.style.transform='translateY(-50%) translate('+newTx+'px,'+newTy+'px)';
+    bannerTextEl.dataset.tx=newTx;
+    bannerTextEl.dataset.ty=newTy;
+    return;
+  }
+  if(!isBannerDrag)return;
+  bannerX=bdStartX+(e.clientX-bdsx);
+  bannerY=bdStartY+(e.clientY-bdsy);
+  applyBannerBg();
+});
+document.addEventListener('mouseup',function(){isBannerDrag=false;isBannerTextDrag=false;});
+
+// Export banner at actual 300x60
+async function doCaptureBanner(){
+  var el=document.getElementById('banner-canvas');
+  var scale=300/el.offsetWidth;
+  var canvas=await html2canvas(el,{
+    scale:scale,
+    width:el.offsetWidth,
+    height:el.offsetHeight,
+    useCORS:true,allowTaint:true,backgroundColor:'#000',logging:false
+  });
+  return canvas;
+}
+async function exportBanner(){
+  var c=await doCaptureBanner();
+  var a=document.createElement('a');
+  a.download='artlist-banner.png';
+  a.href=c.toDataURL('image/png');
+  a.click();
+}
+async function copyBanner(){
+  var c=await doCaptureBanner();
+  c.toBlob(async function(blob){
+    try{
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      var b=document.getElementById('banner-copy-btn');
+      b.textContent='Copied ✓';
+      setTimeout(function(){b.textContent='Copy Banner';},2000);
+    }catch(err){alert('Use Export instead.');}
+  });
+}
+
+// Mark banner text as user-edited
+document.addEventListener('DOMContentLoaded',function(){
+  var bEditor=document.getElementById('banner-text-editor');
+  if(bEditor){
+    bEditor.addEventListener('input',function(){ syncBannerText(); });
+  }
+});
 </script>
 </body>
 </html>

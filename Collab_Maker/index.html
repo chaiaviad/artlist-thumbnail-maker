@@ -63,17 +63,17 @@
   .align2 button{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;padding:9px 4px}
   .align2 button.active{background:var(--accent);color:#111;border-color:var(--accentB)}
   .align2 button:hover{border-color:var(--accent)}
-  .aligngrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;direction:ltr}
-  .aligngrid button{display:flex;aspect-ratio:16/10;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--muted);padding:4px;cursor:pointer}
-  .aligngrid button:hover{border-color:var(--accent)}
-  .aligngrid button.active{border-color:var(--accentB);background:#2b2a16;color:var(--accent)}
-  .aligngrid button i{display:block;width:42%;height:32%;background:currentColor;border-radius:1px}
-  .aligngrid button[data-p^="l"]{justify-content:flex-start}
-  .aligngrid button[data-p^="c"]{justify-content:center}
-  .aligngrid button[data-p^="r"]{justify-content:flex-end}
-  .aligngrid button[data-p$="t"]{align-items:flex-start}
-  .aligngrid button[data-p$="c"]{align-items:center}
-  .aligngrid button[data-p$="b"]{align-items:flex-end}
+  .alignrow{display:flex;gap:5px;direction:ltr;align-items:center}
+  .alignrow .sep{flex:0 0 1px;align-self:stretch;background:var(--line);margin:0 3px}
+  .alignrow button{flex:1;display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--muted);padding:0;cursor:pointer}
+  .alignrow button:hover{border-color:var(--accent);color:var(--txt)}
+  .alignrow button.active{background:var(--accent);color:#111;border-color:var(--accentB)}
+  .alignrow svg{width:17px;height:17px;display:block}
+  .alignrow svg line{stroke:currentColor;stroke-width:2;stroke-linecap:round}
+  .alignrow svg rect{fill:currentColor;opacity:.6}
+  .miniReset{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;font-size:12px;line-height:1;padding:2px 7px;cursor:pointer}
+  .miniReset:hover{border-color:var(--accent);color:var(--txt)}
+  .field .lbl{display:flex;align-items:center;gap:6px}
   .grid9{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
   .grid9 button{aspect-ratio:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--muted);font-size:11px}
   .grid9 button.active{background:var(--accent);color:#111;border-color:var(--accentB)}
@@ -107,7 +107,6 @@
       <button data-f="1:1" title="1200 × 1200 px"><i class="ar" style="width:13px"></i>1:1</button>
       <button data-f="9:16" title="1080 × 1920 px"><i class="ar" style="width:7px"></i>9:16</button>
     </div>
-    <button class="btn" id="guideBtn" title="מיקום וגודל לוגו Artlist לפי הגייד הרשמי לפורמט הנוכחי">★ מיקום גייד Artlist</button>
     <button class="btn" id="applyAllBtn" title="העתקת הפריסה הנוכחית לשני הפורמטים האחרים">⧉ החל על כל הפורמטים</button>
     <button class="btn" id="undoBtn" title="בטל (Ctrl+Z)">↶ בטל</button>
     <div class="spacer"></div>
@@ -117,54 +116,8 @@
   </header>
 
   <div class="body">
-    <!-- CANVAS (fills the rest, on the left) -->
-    <div class="stagewrap" id="stagewrap">
-      <div class="stage" id="stage"></div>
-      <div class="dropmsg" id="dropmsg">שחרר כאן כדי להוסיף לוגו</div>
-    </div>
-
-    <!-- CONTROLS — single panel on the right (RTL) -->
-    <aside class="side right" dir="rtl">
-      <div class="group">
-        <h3>לוגואים בשיתוף הפעולה</h3>
-        <div id="logoList"></div>
-        <button class="btn wide" id="addPartner">＋ הוספת לוגו שותף</button>
-        <button class="btn wide" id="replaceArtlist">↻ החלפת לוגו Artlist</button>
-        <input type="file" id="logoFile" accept="image/*" hidden multiple>
-        <input type="file" id="artlistFile" accept="image/*" hidden>
-        <div class="hint">אפשר גם לגרור קבצים לכאן (Drag&amp;Drop), להדביק תמונה/SVG עם Ctrl+V, או להדביק כתובת תמונה.</div>
-      </div>
-
-      <hr>
-
-      <div class="group">
-        <h3>סידור ה-Lockup <span id="fmtTag" style="color:var(--accent)"></span></h3>
-        <label class="field">גובה הלוגואים: <span id="hVal"></span>
-          <input type="range" id="heightRange" min="1" max="40" step="0.1"></label>
-        <label class="field">מרחק בין הלוגואים: <span id="gapVal"></span>
-          <input type="range" id="gapRange" min="0" max="150" step="1"></label>
-        <label class="toggle"><input type="checkbox" id="divToggle"> קו מפריד בין הלוגואים</label>
-        <button class="btn wide" id="equalBtn">↔ איפוס גדלים לזהים</button>
-      </div>
-
-      <hr>
-
-      <div class="group">
-        <h3>הצמדה למיקום</h3>
-        <div class="aligngrid" id="alignGrid">
-          <button data-p="lt" title="שמאל־עליון"><i></i></button><button data-p="ct" title="מרכז־עליון"><i></i></button><button data-p="rt" title="ימין־עליון"><i></i></button>
-          <button data-p="lc" title="שמאל־אמצע"><i></i></button><button data-p="cc" title="מרכז"><i></i></button><button data-p="rc" title="ימין־אמצע"><i></i></button>
-          <button data-p="lb" title="שמאל־תחתון"><i></i></button><button data-p="cb" title="מרכז־תחתון"><i></i></button><button data-p="rb" title="ימין־תחתון"><i></i></button>
-        </div>
-        <label class="field">מרחק מהצד (אופקי): <span id="mxVal"></span>
-          <input type="range" id="mxRange" min="0" max="15" step="0.05"></label>
-        <label class="field">מרחק מלמעלה/למטה (אנכי): <span id="myVal"></span>
-          <input type="range" id="myRange" min="0" max="20" step="0.05"></label>
-        <label class="toggle"><input type="checkbox" id="snapToggle" checked> הצמדה חכמה (Snap) · החזק Alt לעקיפה</label>
-      </div>
-
-      <hr>
-
+    <!-- LEFT: display background + darkening overlays -->
+    <aside class="side left" dir="rtl">
       <div class="group">
         <h3>רקע תצוגה (לא נכלל בייצוא)</h3>
         <label class="toggle"><input type="checkbox" id="bgToggle" checked> רקע מלא לתצוגה</label>
@@ -172,7 +125,6 @@
           <div class="sw" data-c="transparent" style="background:repeating-conic-gradient(#ccc 0 25%,#fff 0 50%) 50%/10px 10px"></div>
           <div class="sw active" data-c="#000000" style="background:#000"></div>
           <div class="sw" data-c="#ffffff" style="background:#fff"></div>
-          <div class="sw" data-c="#f8da1f" style="background:#f8da1f"></div>
         </div>
         <div class="hint">הייצוא תמיד PNG שקוף ברזולוציה מלאה.</div>
       </div>
@@ -200,6 +152,56 @@
         <label class="field">עוצמה (שקיפות): <span id="opVal"></span>
           <input type="range" id="opRange" min="0" max="100" step="1"></label>
         <button class="btn wide" id="delDark" style="color:var(--danger);border-color:#5a2a2a">🗑 מחיקת ההכהיה</button>
+      </div>
+    </aside>
+
+    <!-- CENTER: canvas -->
+    <div class="stagewrap" id="stagewrap">
+      <div class="stage" id="stage"></div>
+      <div class="dropmsg" id="dropmsg">שחרר כאן כדי להוסיף לוגו</div>
+    </div>
+
+    <!-- CONTROLS — single panel on the right (RTL) -->
+    <aside class="side right" dir="rtl">
+      <div class="group">
+        <h3>לוגואים בשיתוף הפעולה</h3>
+        <div id="logoList"></div>
+        <button class="btn wide" id="addPartner">＋ הוספת לוגו שותף</button>
+        <button class="btn wide" id="replaceArtlist">↻ החלפת לוגו Artlist</button>
+        <input type="file" id="logoFile" accept="image/*" hidden multiple>
+        <input type="file" id="artlistFile" accept="image/*" hidden>
+        <div class="hint">אפשר גם לגרור קבצים לכאן (Drag&amp;Drop), להדביק תמונה/SVG עם Ctrl+V, או להדביק כתובת תמונה.</div>
+      </div>
+
+      <hr>
+
+      <div class="group">
+        <h3>סידור ה-Lockup <span id="fmtTag" style="color:var(--accent)"></span></h3>
+        <label class="field"><span class="lbl">גובה הלוגואים: <span id="hVal"></span><button class="miniReset" id="hReset" type="button" title="איפוס לדיפולט הגייד">↺</button></span>
+          <input type="range" id="heightRange" min="1" max="40" step="0.1"></label>
+        <label class="field"><span class="lbl">מרחק בין הלוגואים: <span id="gapVal"></span><button class="miniReset" id="gapReset" type="button" title="איפוס לדיפולט הגייד">↺</button></span>
+          <input type="range" id="gapRange" min="0" max="150" step="1"></label>
+        <label class="toggle"><input type="checkbox" id="divToggle"> קו מפריד בין הלוגואים</label>
+        <button class="btn wide" id="equalBtn">↔ איפוס גדלים לזהים</button>
+      </div>
+
+      <hr>
+
+      <div class="group">
+        <h3>הצמדה למיקום</h3>
+        <div class="alignrow" id="alignRow">
+          <button data-h="l" title="יישור לשמאל"><svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22"/><rect x="5" y="7" width="12" height="10"/></svg></button>
+          <button data-h="c" title="מרכוז אופקי"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><rect x="6" y="7" width="12" height="10"/></svg></button>
+          <button data-h="r" title="יישור לימין"><svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22"/><rect x="7" y="7" width="12" height="10"/></svg></button>
+          <span class="sep"></span>
+          <button data-v="t" title="יישור למעלה"><svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3"/><rect x="7" y="5" width="10" height="12"/></svg></button>
+          <button data-v="c" title="מרכוז אנכי"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/><rect x="7" y="6" width="10" height="12"/></svg></button>
+          <button data-v="b" title="יישור למטה"><svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21"/><rect x="7" y="7" width="10" height="12"/></svg></button>
+        </div>
+        <label class="field">מרחק מהצד (אופקי): <span id="mxVal"></span>
+          <input type="range" id="mxRange" min="0" max="15" step="0.05"></label>
+        <label class="field">מרחק מלמעלה/למטה (אנכי): <span id="myVal"></span>
+          <input type="range" id="myRange" min="0" max="20" step="0.05"></label>
       </div>
     </aside>
   </div>
@@ -251,14 +253,23 @@ function redo(){ if(!redoStack.length)return; history.push(snapshot()); applySna
 function addLogoFromSrc(src,name,tag){
   const img=new Image();
   img.onload=()=>{
-    state.logos.push({id:state.uid++,name:name||"לוגו",src,natW:img.naturalWidth||300,natH:img.naturalHeight||120,tag:tag||"partner",hf:1});
-    reorderLogos(); redraw(); buildLogoList(); toast("לוגו נוסף");
+    const bg=hasBackground(img);
+    state.logos.push({id:state.uid++,name:name||"לוגו",src,natW:img.naturalWidth||300,natH:img.naturalHeight||120,tag:tag||"partner",hf:1,bg});
+    reorderLogos(); redraw(); buildLogoList(); toast(bg?"⚠ ללוגו יש רקע — עדיף קובץ שקוף (PNG/SVG)":"לוגו נוסף");
   };
   img.onerror=()=>toast("שגיאה בטעינת התמונה");
   img.src=src;
 }
 // Artlist sits on the RIGHT of the lockup (laid out last in left→right order); partner to its left.
 function reorderLogos(){ state.logos.sort((a,b)=>(a.tag==="artlist"?1:0)-(b.tag==="artlist"?1:0)); }
+// Heuristic: a logo "has a background" if most corner+edge sample pixels are opaque.
+function hasBackground(img){ try{
+  const w=Math.max(2,Math.min(img.naturalWidth||32,48)), h=Math.max(2,Math.min(img.naturalHeight||32,48));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.drawImage(img,0,0,w,h);
+  const pts=[[0,0],[w-1,0],[0,h-1],[w-1,h-1],[w>>1,0],[w>>1,h-1]]; let opaque=0;
+  for(const p of pts){ if(x.getImageData(p[0],p[1],1,1).data[3]>248) opaque++; }
+  return opaque>=4;
+}catch(e){ return false; } }
 function setArtlist(src){
   try{localStorage.setItem("artlistLogo",src);}catch(_){}
   const cur=state.logos.find(l=>l.tag==="artlist");
@@ -342,7 +353,7 @@ function fitStage(){ const f=F(),pad=48;
 window.addEventListener("resize",fitStage);
 
 /* ---------- interaction ---------- */
-let drag=null;
+let drag=null, dragIdx=null;
 stage.addEventListener("pointerdown",e=>{
   const hEl=e.target.closest(".handle"), node=e.target.closest(".el");
   if(!node){ state.sel={type:null,id:null}; redraw(); buildLogoList(); return; }
@@ -364,7 +375,7 @@ window.addEventListener("pointermove",e=>{ if(!drag)return;
   const s=state.scale,dx=(e.clientX-drag.sx)/s,dy=(e.clientY-drag.sy)/s;
   let lineX=null,lineY=null;
   if(drag.mode==="move"){ const lay=L(),f=F(),box=groupBox(),gm=guideSafe(state.format); let nx=drag.ox+dx, ny=drag.oy+dy;
-    if($("snapToggle").checked && !e.altKey){ const thr=8/s;
+    if(!e.altKey){ const thr=8/s;
       const xT=[{e:0,v:gm.mx},{e:.5,v:f.w/2},{e:1,v:f.w-gm.mx}];
       for(const t of xT){ if(Math.abs((nx+box.w*t.e)-t.v)<thr){ nx=t.v-box.w*t.e; lineX=t.v; break; } }
       const yT=[{e:0,v:gm.my},{e:.5,v:f.h/2},{e:1,v:f.h-gm.my}];
@@ -402,9 +413,13 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
     row.querySelector('[data-a=right]').onclick=()=>{pushUndo();swap(i,i+1);};
     row.querySelector('[data-a=del]').onclick=()=>{pushUndo();removeLogo(l.id);};
     row.querySelector('[data-a=tag]').onchange=ev=>{pushUndo();l.tag=ev.target.value; reorderLogos(); redraw(); buildLogoList(); toast(l.tag==="partner"?"תויג כלוגו שותף":"תויג כ-Artlist");};
+    row.draggable=true; row.style.cursor="grab";
+    row.addEventListener("dragstart",ev=>{dragIdx=i;ev.dataTransfer.effectAllowed="move";});
+    row.addEventListener("dragover",ev=>ev.preventDefault());
+    row.addEventListener("drop",ev=>{ev.preventDefault();if(dragIdx==null||dragIdx===i)return;pushUndo();const ls=state.logos;const [m]=ls.splice(dragIdx,1);ls.splice(i,0,m);dragIdx=null;redraw();buildLogoList();});
     box.appendChild(row); });
 }
-function swap(i,j){ const ls=state.logos; if(j<0||j>=ls.length)return; [ls[i],ls[j]]=[ls[j],ls[i]]; reorderLogos(); redraw(); buildLogoList(); }
+function swap(i,j){ const ls=state.logos; if(j<0||j>=ls.length)return; [ls[i],ls[j]]=[ls[j],ls[i]]; redraw(); buildLogoList(); }
 function removeLogo(id){ state.logos=state.logos.filter(l=>l.id!==id); if(sel("logo",id))state.sel={type:null,id:null}; redraw(); buildLogoList(); }
 
 /* ---------- right: dark list + props ---------- */
@@ -447,11 +462,15 @@ $("equalBtn").onclick=()=>{pushUndo();state.logos.forEach(l=>l.hf=1);redraw();to
 // snapshot once when grabbing any slider
 ["heightRange","gapRange","mxRange","myRange","covRange","featRange","opRange"].forEach(id=>$(id).addEventListener("pointerdown",pushUndo));
 
-$("alignGrid").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;pushUndo();const lay=L();lay.align=b.dataset.p;lay.x=lay.y=null;redraw();markAlignUI();});
-function markAlignUI(){const a=L().align;[...$("alignGrid").children].forEach(x=>x.classList.toggle("active",a!=="free"&&x.dataset.p===a));}
-function clearAlignUI(){[...$("alignGrid").children].forEach(x=>x.classList.remove("active"));}
+$("alignRow").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;pushUndo();const lay=L();
+  if(b.dataset.h){const v=lay.align==="free"?"t":lay.align[1];lay.align=b.dataset.h+v;}
+  else{const h=lay.align==="free"?"l":lay.align[0];lay.align=h+b.dataset.v;}
+  lay.x=lay.y=null;redraw();markAlignUI();});
+function markAlignUI(){const a=L().align;$("alignRow").querySelectorAll("[data-h]").forEach(x=>x.classList.toggle("active",a!=="free"&&x.dataset.h===a[0]));$("alignRow").querySelectorAll("[data-v]").forEach(x=>x.classList.toggle("active",a!=="free"&&x.dataset.v===a[1]));}
+function clearAlignUI(){[...$("alignRow").children].forEach(x=>x.classList.remove("active"));}
 
-$("guideBtn").onclick=()=>{ pushUndo(); state.layouts[state.format]=guideLayout(state.format); syncControls(); redraw(); toast("מוקם לפי הגייד של Artlist · "+state.format); };
+$("hReset").onclick=e=>{e.preventDefault();e.stopPropagation();pushUndo();L().hPct=guideLayout(state.format).hPct;syncControls();redraw();toast("גובה הלוגואים אופס לדיפולט");};
+$("gapReset").onclick=e=>{e.preventDefault();e.stopPropagation();pushUndo();L().gapPct=guideLayout(state.format).gapPct;syncControls();redraw();toast("המרווח אופס לדיפולט");};
 $("undoBtn").onclick=undo;
 $("applyAllBtn").onclick=()=>{ pushUndo(); const c=L(); for(const k in state.layouts){ if(k===state.format)continue;
   state.layouts[k]={align:c.align,hPct:c.hPct,gapPct:c.gapPct,mxPct:c.mxPct,myPct:c.myPct,divider:c.divider,x:null,y:null}; }

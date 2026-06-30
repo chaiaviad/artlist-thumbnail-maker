@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artlist Tools</title>
+<style>
+  :root{
+    --bg:#0c0c0e; --bg2:#141417; --card:#17171b; --line:#2a2a32;
+    --txt:#f4f4f6; --muted:#9a9aa6; --accent:#f8da1f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:
+     radial-gradient(900px 500px at 80% -10%, rgba(248,218,31,.10), transparent 60%),
+     radial-gradient(700px 500px at 0% 110%, rgba(248,218,31,.06), transparent 55%),
+     var(--bg);
+     color:var(--txt);font-family:"Segoe UI",Arial,Helvetica,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:64px 24px 80px;display:flex;flex-direction:column;gap:48px}
+  header{display:flex;flex-direction:column;gap:14px}
+  .brand{font-size:30px;font-weight:800;color:var(--accent);letter-spacing:.5px;display:flex;align-items:center;gap:2px}
+  .brand b{color:var(--txt);font-weight:600;font-size:18px;margin-inline-start:8px;letter-spacing:0}
+  .lead{color:var(--muted);font-size:15px;max-width:60ch;line-height:1.6}
+  .eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+  .card{position:relative;display:flex;flex-direction:column;gap:14px;background:var(--card);
+     border:1px solid var(--line);border-radius:18px;padding:26px;text-decoration:none;color:inherit;
+     transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .thumb{height:128px;border-radius:12px;border:1px solid var(--line);overflow:hidden;position:relative;background:var(--bg2)}
+  .thumb .mini{position:absolute;background:var(--accent);border-radius:3px}
+  .ttl{font-size:19px;font-weight:700}
+  .desc{font-size:13.5px;color:var(--muted);line-height:1.6;flex:1}
+  .tags{display:flex;flex-wrap:wrap;gap:7px}
+  .tag{font-size:11px;font-weight:600;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+  .go{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:#111;background:var(--accent);
+     border-radius:10px;padding:9px 16px;align-self:flex-start}
+  footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:20px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">▲rtlist<b>Tools</b></div>
+      <div class="eyebrow">Internal creative toolkit</div>
+      <p class="lead">אוסף הכלים הפנימי של Artlist להפקת ויזואלים. בחרו כלי כדי להתחיל — הכל רץ בדפדפן, בלי התקנות.</p>
+    </header>
+
+    <main class="grid">
+      <a class="card" href="thumbnail-banner-maker.html">
+        <div class="thumb" aria-hidden="true">
+          <div class="mini" style="inset-inline-start:14px;top:14px;width:60px;height:14px"></div>
+          <div class="mini" style="inset-inline-start:14px;bottom:18px;width:150px;height:46px;opacity:.85"></div>
+          <div class="mini" style="inset-inline-end:14px;top:14px;width:34px;height:34px;border-radius:50%;opacity:.7"></div>
+        </div>
+        <div class="ttl">Thumbnail &amp; Banner Maker</div>
+        <p class="desc">יצירת thumbnails ובאנרים — טקסט, תמונות, רקעים ופריסות מוכנות לפי הסטנדרט של Artlist.</p>
+        <div class="tags"><span class="tag">Thumbnails</span><span class="tag">Banners</span></div>
+        <span class="go">פתיחת הכלי ←</span>
+      </a>
+
+      <a class="card" href="collab-maker.html">
+        <div class="thumb" aria-hidden="true">
+          <div class="mini" style="inset-inline-start:14px;top:14px;width:44px;height:14px"></div>
+          <div class="mini" style="inset-inline-start:66px;top:15px;width:40px;height:12px;opacity:.7"></div>
+          <div class="mini" style="inset-inline-end:16px;bottom:16px;width:120px;height:64px;border-radius:50%;opacity:.18"></div>
+        </div>
+        <div class="ttl">Collab Maker</div>
+        <p class="desc">מיקום וייצוא לוגו Artlist + לוגו שותף בשלושה פורמטים, לפי מרווחי הגייד הרשמי. ייצוא PNG שקוף.</p>
+        <div class="tags"><span class="tag">16:9</span><span class="tag">1:1</span><span class="tag">9:16</span><span class="tag">PNG שקוף</span></div>
+        <span class="go">פתיחת הכלי ←</span>
+      </a>
+    </main>
+
+    <footer>Artlist Tools · רץ מקומית בדפדפן · ללא שרת</footer>
+  </div>
+</body>
+</html>

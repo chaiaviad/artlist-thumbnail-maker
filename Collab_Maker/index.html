@@ -15,8 +15,9 @@
   header .brand b{color:var(--txt);font-weight:600;font-size:14px;margin-inline-start:6px}
   header .spacer{flex:1}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  .seg button{background:transparent;color:var(--muted);border:0;padding:8px 14px;font-size:13px;font-weight:600}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:8px 14px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
   .seg button.active{background:var(--accent);color:#111}
+  .ar{display:inline-block;border:1.6px solid currentColor;border-radius:2px;height:13px;opacity:.8;flex:0 0 auto}
   .btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:8px 13px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:7px}
   .btn:hover{border-color:#3a3a44}
   .btn.primary{background:var(--accent);color:#111;border-color:var(--accentB)}
@@ -48,6 +49,9 @@
   .snapline{position:absolute;z-index:7;pointer-events:none;background:var(--accent);opacity:.9}
   .snapline.v{width:1px;top:0;bottom:0}
   .snapline.h{height:1px;left:0;right:0}
+  .guideline{position:absolute;z-index:5;pointer-events:none;background:rgba(248,218,31,.4)}
+  .guideline.v{width:1px;top:0;bottom:0}
+  .guideline.h{height:1px;left:0;right:0}
 
   h3{margin:0 0 2px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
   .group{display:flex;flex-direction:column;gap:10px}
@@ -79,15 +83,17 @@
   .empty{font-size:12px;color:var(--muted);font-style:italic}
   #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#111;font-weight:700;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .25s;z-index:99;pointer-events:none}
   #toast.show{opacity:1}
+  #applyTip{position:fixed;z-index:120;max-width:240px;background:var(--accent);color:#111;font-size:12.5px;font-weight:600;line-height:1.55;padding:10px 12px;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.55)}
+  #applyTip .x{display:inline-block;margin-top:8px;font-size:11px;font-weight:800;text-decoration:underline;cursor:pointer}
 </style>
 
 <div class="app">
   <header>
-    <div class="brand">▲rtlist<b>Collab Maker</b></div>
+    <div class="brand"><img id="brandLogo" alt="Artlist" style="height:22px;width:auto;display:block"><b>Collab Maker</b></div>
     <div class="seg" id="formatSeg">
-      <button data-f="16:9" class="active">16:9 · 1920×1080</button>
-      <button data-f="1:1">1:1 · 1200×1200</button>
-      <button data-f="9:16">9:16 · 1080×1920</button>
+      <button data-f="16:9" class="active" title="1920 × 1080 px"><i class="ar" style="width:23px"></i>16:9</button>
+      <button data-f="1:1" title="1200 × 1200 px"><i class="ar" style="width:13px"></i>1:1</button>
+      <button data-f="9:16" title="1080 × 1920 px"><i class="ar" style="width:7px"></i>9:16</button>
     </div>
     <button class="btn" id="guideBtn" title="מיקום וגודל לוגו Artlist לפי הגייד הרשמי לפורמט הנוכחי">★ מיקום גייד Artlist</button>
     <button class="btn" id="applyAllBtn" title="העתקת הפריסה הנוכחית לשני הפורמטים האחרים">⧉ החל על כל הפורמטים</button>
@@ -118,7 +124,7 @@
         <label class="field">גובה הלוגואים: <span id="hVal"></span>
           <input type="range" id="heightRange" min="1" max="40" step="0.1"></label>
         <label class="field">מרחק בין הלוגואים: <span id="gapVal"></span>
-          <input type="range" id="gapRange" min="0" max="30" step="0.5"></label>
+          <input type="range" id="gapRange" min="0" max="150" step="1"></label>
         <label class="toggle"><input type="checkbox" id="divToggle"> קו מפריד בין הלוגואים</label>
         <button class="btn wide" id="equalBtn">↔ איפוס גדלים לזהים</button>
       </div>
@@ -178,10 +184,10 @@
 
       <div class="group">
         <h3>רקע תצוגה (לא נכלל בייצוא)</h3>
-        <label class="toggle"><input type="checkbox" id="bgToggle"> רקע מלא לתצוגה</label>
+        <label class="toggle"><input type="checkbox" id="bgToggle" checked> רקע מלא לתצוגה</label>
         <div class="swatches" id="bgSwatches">
-          <div class="sw active" data-c="transparent" style="background:repeating-conic-gradient(#ccc 0 25%,#fff 0 50%) 50%/10px 10px"></div>
-          <div class="sw" data-c="#000000" style="background:#000"></div>
+          <div class="sw" data-c="transparent" style="background:repeating-conic-gradient(#ccc 0 25%,#fff 0 50%) 50%/10px 10px"></div>
+          <div class="sw active" data-c="#000000" style="background:#000"></div>
           <div class="sw" data-c="#ffffff" style="background:#fff"></div>
           <div class="sw" data-c="#f8da1f" style="background:#f8da1f"></div>
         </div>
@@ -191,6 +197,7 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="applyTip" style="display:none"></div>
 
 <script>
 const FORMATS={ "16:9":{w:1920,h:1080}, "1:1":{w:1200,h:1200}, "9:16":{w:1080,h:1920} };
@@ -199,10 +206,12 @@ const ARTLIST_LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAB9QAAAIcCAYAAA
 
 // Official Artlist placement spec, measured from the brand guide (Guide/*.png), as canvas fractions.
 function guideLayout(fmt){
-  if(fmt==="16:9") return {align:"lt", hPct:3.8,  gapPct:3, mxPct:1.95, myPct:2.31, divider:false, x:null,y:null};
-  if(fmt==="1:1")  return {align:"lt", hPct:3.39, gapPct:3, mxPct:3.25, myPct:2.25, divider:false, x:null,y:null};
-  return                 {align:"ct", hPct:2.81, gapPct:3, mxPct:3,    myPct:10.05,divider:false, x:null,y:null};
+  if(fmt==="16:9") return {align:"lt", hPct:3.8,  gapPct:50, mxPct:1.95, myPct:2.31, divider:false, x:null,y:null};
+  if(fmt==="1:1")  return {align:"lt", hPct:3.39, gapPct:50, mxPct:3.25, myPct:2.25, divider:false, x:null,y:null};
+  return                 {align:"ct", hPct:2.81, gapPct:50, mxPct:3,    myPct:10.05,divider:false, x:null,y:null};
 }
+// Official guide safe-margins (px) — closest the lockup may get to any edge, per the brand guide.
+function guideSafe(fmt){ const g=guideLayout(fmt),f=FORMATS[fmt]; return {mx:f.w*g.mxPct/100, my:f.h*g.myPct/100}; }
 const state={
   format:"16:9", scale:1,
   logos:[],                       // {id,name,src,natW,natH,tag:'artlist'|'partner',hf}
@@ -240,7 +249,8 @@ function addLogoFromSrc(src,name,tag){
   img.onerror=()=>toast("שגיאה בטעינת התמונה");
   img.src=src;
 }
-function reorderLogos(){ state.logos.sort((a,b)=>(a.tag==="artlist"?0:1)-(b.tag==="artlist"?0:1)); }
+// Artlist sits on the RIGHT of the lockup (laid out last in left→right order); partner to its left.
+function reorderLogos(){ state.logos.sort((a,b)=>(a.tag==="artlist"?1:0)-(b.tag==="artlist"?1:0)); }
 function setArtlist(src){
   try{localStorage.setItem("artlistLogo",src);}catch(_){}
   const cur=state.logos.find(l=>l.tag==="artlist");
@@ -250,7 +260,7 @@ function setArtlist(src){
 function baseH(){ return F().h*(L().hPct/100); }
 function logoH(l){ return baseH()*l.hf; }
 function logoW(l){ return logoH(l)*(l.natW/l.natH); }
-function groupBox(){ const ls=state.logos; if(!ls.length)return{w:0,h:0}; let w=0,mh=0; const gap=F().w*(L().gapPct/100);
+function groupBox(){ const ls=state.logos; if(!ls.length)return{w:0,h:0}; let w=0,mh=0; const gap=baseH()*(L().gapPct/100);
   ls.forEach(l=>{w+=logoW(l);mh=Math.max(mh,logoH(l));}); w+=gap*(ls.length-1); return{w,h:mh}; }
 function groupPos(){ const lay=L(),box=groupBox(),f=F();
   if(lay.align==="free" && lay.x!=null) return {x:lay.x,y:lay.y};
@@ -300,9 +310,9 @@ function drawScrim(ctx,d,W,H){
 /* ---------- render ---------- */
 function redraw(){
   const s=state.scale, lay=L(), box=groupBox(), pos=groupPos();
-  stage.querySelectorAll(".el,.divline,.scrim,.snapline").forEach(n=>n.remove());
+  stage.querySelectorAll(".el,.divline,.scrim,.snapline,.guideline").forEach(n=>n.remove());
   state.darks.forEach(d=>{ const n=document.createElement("div"); n.className="scrim"; n.style.background=scrimCSS(d); stage.appendChild(n); });
-  let cx=pos.x; const gap=F().w*(L().gapPct/100);
+  let cx=pos.x; const gap=baseH()*(L().gapPct/100);
   state.logos.forEach((l,i)=>{ const w=logoW(l),h=logoH(l),y=pos.y+(box.h-h)/2;
     const n=document.createElement("div"); n.className="el"+(sel("logo",l.id)?" sel":"");
     n.style.cssText=`left:${cx*s}px;top:${y*s}px;width:${w*s}px;height:${h*s}px`;
@@ -319,7 +329,7 @@ function redraw(){
 function sel(type,id){ return state.sel.type===type&&state.sel.id===id; }
 
 function fitStage(){ const f=F(),pad=48;
-  state.scale=Math.min((stagewrap.clientWidth-pad)/f.w,(stagewrap.clientHeight-pad)/f.h,1);
+  state.scale=Math.max(0.05,Math.min((stagewrap.clientWidth-pad)/f.w,(stagewrap.clientHeight-pad)/f.h,1));
   stage.style.width=f.w*state.scale+"px"; stage.style.height=f.h*state.scale+"px"; redraw(); }
 window.addEventListener("resize",fitStage);
 
@@ -337,23 +347,31 @@ stage.addEventListener("pointerdown",e=>{
 function drawSnaplines(lineX,lineY){ stage.querySelectorAll(".snapline").forEach(n=>n.remove()); const s=state.scale;
   if(lineX!=null){ const d=document.createElement("div"); d.className="snapline v"; d.style.left=lineX*s+"px"; stage.appendChild(d); }
   if(lineY!=null){ const d=document.createElement("div"); d.className="snapline h"; d.style.top=lineY*s+"px"; stage.appendChild(d); } }
+function drawGuides(){ const f=F(),gm=guideSafe(state.format),s=state.scale;
+  stage.querySelectorAll(".guideline").forEach(n=>n.remove());
+  [gm.mx,f.w-gm.mx,f.w/2].forEach(x=>{const d=document.createElement("div");d.className="guideline v";d.style.left=x*s+"px";stage.appendChild(d);});
+  [gm.my,f.h-gm.my,f.h/2].forEach(y=>{const d=document.createElement("div");d.className="guideline h";d.style.top=y*s+"px";stage.appendChild(d);}); }
 window.addEventListener("pointermove",e=>{ if(!drag)return;
   if(!drag.committed){ pushUndo(); drag.committed=true; }
   const s=state.scale,dx=(e.clientX-drag.sx)/s,dy=(e.clientY-drag.sy)/s;
   let lineX=null,lineY=null;
-  if(drag.mode==="move"){ const lay=L(),f=F(),box=groupBox(); let nx=drag.ox+dx, ny=drag.oy+dy;
-    if($("snapToggle").checked && !e.altKey){ const thr=8/s, mx=f.w*(lay.mxPct/100), my=f.h*(lay.myPct/100);
-      const xT=[{e:0,v:0},{e:0,v:mx},{e:.5,v:f.w/2},{e:1,v:f.w-mx},{e:1,v:f.w}];
+  if(drag.mode==="move"){ const lay=L(),f=F(),box=groupBox(),gm=guideSafe(state.format); let nx=drag.ox+dx, ny=drag.oy+dy;
+    if($("snapToggle").checked && !e.altKey){ const thr=8/s;
+      const xT=[{e:0,v:gm.mx},{e:.5,v:f.w/2},{e:1,v:f.w-gm.mx}];
       for(const t of xT){ if(Math.abs((nx+box.w*t.e)-t.v)<thr){ nx=t.v-box.w*t.e; lineX=t.v; break; } }
-      const yT=[{e:0,v:0},{e:0,v:my},{e:.5,v:f.h/2},{e:1,v:f.h-my},{e:1,v:f.h}];
+      const yT=[{e:0,v:gm.my},{e:.5,v:f.h/2},{e:1,v:f.h-gm.my}];
       for(const t of yT){ if(Math.abs((ny+box.h*t.e)-t.v)<thr){ ny=t.v-box.h*t.e; lineY=t.v; break; } }
     }
+    // clamp inside the official guide safe-zone — the lockup can't get closer to any edge than the guide
+    const maxX=f.w-box.w-gm.mx, maxY=f.h-box.h-gm.my;
+    nx=(maxX<gm.mx)?(f.w-box.w)/2:Math.max(gm.mx,Math.min(maxX,nx));
+    ny=(maxY<gm.my)?(f.h-box.h)/2:Math.max(gm.my,Math.min(maxY,ny));
     lay.align="free"; lay.x=Math.round(nx); lay.y=Math.round(ny); clearAlignUI();
   } else { const newH=Math.max(10,drag.oh+(drag.up?-dy:dy)); drag.l.hf=newH/baseH(); }
   redraw();
-  if(drag.mode==="move") drawSnaplines(lineX,lineY);
+  if(drag.mode==="move"){ drawGuides(); drawSnaplines(lineX,lineY); }
 });
-window.addEventListener("pointerup",()=>{ drag=null; stage.querySelectorAll(".snapline").forEach(n=>n.remove()); });
+window.addEventListener("pointerup",()=>{ drag=null; stage.querySelectorAll(".snapline,.guideline").forEach(n=>n.remove()); });
 window.addEventListener("keydown",e=>{
   const ae=document.activeElement, typing=ae&&(ae.tagName==="TEXTAREA"||(ae.tagName==="INPUT"&&/^(number|text)$/.test(ae.type)));
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){ if(typing)return; e.preventDefault(); e.shiftKey?redo():undo(); return; }
@@ -413,7 +431,7 @@ $("artlistFile").onchange=e=>{const f=e.target.files[0];if(f){pushUndo();fileToS
 function fileToSrc(file,cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(file); }
 
 $("heightRange").oninput=()=>{L().hPct=+$("heightRange").value;$("hVal").textContent=L().hPct+"% ("+Math.round(baseH())+"px)";redraw();};
-$("gapRange").oninput=()=>{L().gapPct=+$("gapRange").value;$("gapVal").textContent=L().gapPct+"% ("+Math.round(F().w*L().gapPct/100)+"px)";redraw();};
+$("gapRange").oninput=()=>{L().gapPct=+$("gapRange").value;$("gapVal").textContent=L().gapPct+"% ("+Math.round(baseH()*L().gapPct/100)+"px)";redraw();};
 $("mxRange").oninput=()=>{L().mxPct=+$("mxRange").value;$("mxVal").textContent=L().mxPct+"%";redraw();};
 $("myRange").oninput=()=>{L().myPct=+$("myRange").value;$("myVal").textContent=L().myPct+"%";redraw();};
 $("divToggle").onchange=()=>{pushUndo();L().divider=$("divToggle").checked;redraw();};
@@ -473,7 +491,7 @@ function addFromText(t){
 async function renderFormat(fmt){ const f=FORMATS[fmt], lay=state.layouts[fmt];
   const cv=document.createElement("canvas"); cv.width=f.w; cv.height=f.h; const ctx=cv.getContext("2d");
   state.darks.forEach(d=>drawScrim(ctx,d,f.w,f.h));
-  const gap=f.w*(lay.gapPct/100), base=f.h*(lay.hPct/100);
+  const base=f.h*(lay.hPct/100), gap=base*(lay.gapPct/100);
   let bw=0,bh=0; state.logos.forEach(l=>{const h=base*l.hf;bw+=h*(l.natW/l.natH);bh=Math.max(bh,h);}); bw+=gap*Math.max(0,state.logos.length-1);
   let px,py; const mx=f.w*(lay.mxPct/100), my=f.h*(lay.myPct/100);
   if(lay.align==="free"&&lay.x!=null){px=lay.x;py=lay.y;} else { const X={l:mx,c:(f.w-bw)/2,r:f.w-bw-mx},Y={t:my,c:(f.h-bh)/2,b:f.h-bh-my}; px=X[lay.align[0]];py=Y[lay.align[1]]; }
@@ -493,11 +511,23 @@ function drawImg(ctx,src,x,y,w,h){return new Promise(res=>{const im=new Image();
 function syncControls(){ const lay=L();
   $("fmtTag").textContent="· "+state.format;
   $("heightRange").value=lay.hPct;$("hVal").textContent=lay.hPct+"% ("+Math.round(baseH())+"px)";
-  $("gapRange").value=lay.gapPct;$("gapVal").textContent=lay.gapPct+"% ("+Math.round(F().w*lay.gapPct/100)+"px)";
+  $("gapRange").value=lay.gapPct;$("gapVal").textContent=lay.gapPct+"% ("+Math.round(baseH()*lay.gapPct/100)+"px)";
+  const gmin=guideLayout(state.format);
+  $("mxRange").min=gmin.mxPct; $("myRange").min=gmin.myPct;
+  if(lay.mxPct<gmin.mxPct)lay.mxPct=gmin.mxPct; if(lay.myPct<gmin.myPct)lay.myPct=gmin.myPct;
   $("mxRange").value=lay.mxPct;$("mxVal").textContent=lay.mxPct+"%";
   $("myRange").value=lay.myPct;$("myVal").textContent=lay.myPct+"%";
   $("divToggle").checked=lay.divider; markAlignUI();
 }
 syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
 addLogoFromSrc(localStorage.getItem("artlistLogo")||ARTLIST_LOGO,"Artlist","artlist");
+$("brandLogo").src=ARTLIST_LOGO;
+stage.dataset.bg="#000000"; updateBg();
+if(!localStorage.getItem("collabApplyTipSeen")){ const tip=$("applyTip");
+  tip.innerHTML='בלחיצה כאן כל שלושת הפורמטים מתעדכנים לפי הפריסה הנוכחית.<br><span class="x">הבנתי ✕</span>';
+  const r=$("applyAllBtn").getBoundingClientRect(); tip.style.display="block";
+  tip.style.top=(r.bottom+9)+"px"; tip.style.left=Math.max(8,Math.min(r.left,window.innerWidth-250))+"px";
+  const close=()=>{tip.style.display="none";localStorage.setItem("collabApplyTipSeen","1");};
+  tip.querySelector(".x").onclick=close; setTimeout(close,9000);
+}
 </script>

@@ -52,6 +52,9 @@
   .guideline{position:absolute;z-index:5;pointer-events:none;background:rgba(248,218,31,.4)}
   .guideline.v{width:1px;top:0;bottom:0}
   .guideline.h{height:1px;left:0;right:0}
+  .gridline{position:absolute;z-index:1;pointer-events:none;background:rgba(248,218,31,.13)}
+  .gridline.v{width:1px;top:0;bottom:0}
+  .gridline.h{height:1px;left:0;right:0}
 
   h3{margin:0 0 2px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
   .group{display:flex;flex-direction:column;gap:10px}
@@ -348,7 +351,10 @@ function loadState(){ try{ const s=localStorage.getItem(SAVEKEY); if(!s)return f
 /* ---------- render ---------- */
 function redraw(){
   const s=state.scale, lay=L(), box=groupBox(), pos=groupPos(), f=F();
-  stage.querySelectorAll(".el,.divline,.scrim,.snapline,.guideline").forEach(n=>n.remove());
+  stage.querySelectorAll(".el,.divline,.scrim,.snapline,.guideline,.gridline").forEach(n=>n.remove());
+  { const gm=guideSafe(state.format); // faint guide grid, always visible for orientation
+    [gm.mx,f.w-gm.mx,f.w/2].forEach(x=>{const d=document.createElement("div");d.className="gridline v";d.style.left=x*s+"px";stage.appendChild(d);});
+    [gm.my,f.h-gm.my,f.h/2].forEach(y=>{const d=document.createElement("div");d.className="gridline h";d.style.top=y*s+"px";stage.appendChild(d);}); }
   state.darks.forEach(d=>{ const n=document.createElement("div"); n.className="scrim"; n.style.background=scrimCSS(d); stage.appendChild(n); });
   let cx=pos.x; const gap=baseH()*(L().gapPct/100);
   state.logos.forEach((l,i)=>{ const w=logoW(l),h=logoH(l); let lx=cx+(l.dxPct||0)*f.w,y=pos.y+(box.h-h)/2+(l.dyPct||0)*f.h;

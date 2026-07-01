@@ -178,9 +178,7 @@
         <div id="logoList"></div>
         <button class="btn wide" id="addPartner">＋ הוספת לוגו שותף</button>
         <button class="btn wide" id="addArtlist" style="display:none">＋ הוספת לוגו Artlist</button>
-        <button class="btn wide" id="replaceArtlist">↻ החלפת לוגו Artlist</button>
         <input type="file" id="logoFile" accept="image/*" hidden multiple>
-        <input type="file" id="artlistFile" accept="image/*" hidden>
         <div class="hint">אפשר גם לגרור קבצים לכאן (Drag&amp;Drop), להדביק תמונה/SVG עם Ctrl+V, או להדביק כתובת תמונה.</div>
       </div>
 
@@ -285,12 +283,6 @@ function hasBackground(img){ try{
   for(const p of pts){ if(x.getImageData(p[0],p[1],1,1).data[3]>248) opaque++; }
   return opaque>=4;
 }catch(e){ return false; } }
-function setArtlist(src){
-  try{localStorage.setItem("artlistLogo",src);}catch(_){}
-  const cur=state.logos.find(l=>l.tag==="artlist");
-  if(cur){ const im=new Image(); im.onload=()=>{cur.src=src;cur.natW=im.naturalWidth;cur.natH=im.naturalHeight;redraw();buildLogoList();toast("לוגו Artlist עודכן");}; im.src=src; }
-  else addLogoFromSrc(src,"Artlist","artlist");
-}
 function baseH(){ return F().h*(L().hPct/100); }
 function logoH(l){ return baseH()*l.hf; }
 function logoW(l){ return logoH(l)*(l.natW/l.natH); }
@@ -344,9 +336,11 @@ function drawScrim(ctx,d,W,H){
 
 /* ---------- persistence (survives page refresh) ---------- */
 const SAVEKEY="collabState_v1"; let saveT;
+try{localStorage.removeItem("artlistLogo");}catch(e){}
 function saveState(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(SAVEKEY,JSON.stringify({logos:state.logos,layouts:state.layouts,darks:state.darks,format:state.format,uid:state.uid})); }catch(e){} },400); }
 function loadState(){ try{ const s=localStorage.getItem(SAVEKEY); if(!s)return false; const o=JSON.parse(s); if(!o||!Array.isArray(o.logos)||!o.logos.length)return false;
-  state.logos=o.logos; if(o.layouts)state.layouts=o.layouts; state.darks=o.darks||[]; state.format=o.format||"16:9"; state.uid=o.uid||state.uid; return true; }catch(e){ return false; } }
+  state.logos=o.logos; if(o.layouts)state.layouts=o.layouts; state.darks=o.darks||[]; state.format=o.format||"16:9"; state.uid=o.uid||state.uid;
+  state.logos.forEach(l=>{ if(l.tag==="artlist")l.src=ARTLIST_LOGO; }); return true; }catch(e){ return false; } }
 
 /* ---------- render ---------- */
 function redraw(){
@@ -462,7 +456,7 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
         <label class="field"><span class="lbl">גודל <b class="v">${Math.round(l.hf*100)}%</b></span><input type="range" class="eSize" min="20" max="400" value="${Math.round(l.hf*100)}"></label>
         <label class="field"><span class="lbl">מיקום X <b class="v">${curX}</b></span><input type="range" class="eX" min="0" max="${maxX}" value="${Math.min(curX,maxX)}"></label>
         <label class="field"><span class="lbl">מיקום Y <b class="v">${curY}</b></span><input type="range" class="eY" min="0" max="${maxY}" value="${Math.min(curY,maxY)}"></label>
-        <button class="btn wide eReset">↺ איפוס מיקום הלוגו</button>`;
+        <button class="btn wide eReset">↺ איפוס הלוגו</button>`;
       const eS=ed.querySelector(".eSize"), eX=ed.querySelector(".eX"), eY=ed.querySelector(".eY");
       eS.addEventListener("pointerdown",pushUndo);
       eS.oninput=()=>{ l.hf=clampHf(l,+eS.value/100); eS.previousElementSibling.querySelector(".v").textContent=Math.round(l.hf*100)+"%"; redraw(); };
@@ -470,7 +464,7 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
       eX.oninput=()=>{ const s2=logoSlot(l); l.dxPct=(+eX.value - s2.x)/f.w; eX.previousElementSibling.querySelector(".v").textContent=eX.value; redraw(); };
       eY.addEventListener("pointerdown",pushUndo);
       eY.oninput=()=>{ const s2=logoSlot(l); l.dyPct=(+eY.value - s2.y)/f.h; eY.previousElementSibling.querySelector(".v").textContent=eY.value; redraw(); };
-      ed.querySelector(".eReset").onclick=()=>{ pushUndo(); l.dxPct=0; l.dyPct=0; redraw(); buildLogoList(); };
+      ed.querySelector(".eReset").onclick=()=>{ pushUndo(); l.dxPct=0; l.dyPct=0; l.hf=1; redraw(); buildLogoList(); };
       row.appendChild(ed);
     }
     const handle=top.querySelector(".dragHandle"); handle.draggable=true;
@@ -512,10 +506,8 @@ $("addDark").onclick=addDark;
 /* ---------- controls ---------- */
 $("formatSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;[...e.currentTarget.children].forEach(x=>x.classList.remove("active"));b.classList.add("active");state.format=b.dataset.f;syncControls();fitStage();});
 $("addPartner").onclick=()=>$("logoFile").click();
-$("addArtlist").onclick=()=>{ if(state.logos.some(l=>l.tag==="artlist")){toast("לוגו Artlist כבר קיים");return;} pushUndo(); addLogoFromSrc(localStorage.getItem("artlistLogo")||ARTLIST_LOGO,"Artlist","artlist"); };
+$("addArtlist").onclick=()=>{ if(state.logos.some(l=>l.tag==="artlist")){toast("לוגו Artlist כבר קיים");return;} pushUndo(); addLogoFromSrc(ARTLIST_LOGO,"Artlist","artlist"); };
 $("logoFile").onchange=e=>{if(e.target.files.length)pushUndo();[...e.target.files].forEach(f=>fileToSrc(f,s=>addLogoFromSrc(s,f.name.replace(/\.[^.]+$/,""),"partner")));e.target.value="";};
-$("replaceArtlist").onclick=()=>$("artlistFile").click();
-$("artlistFile").onchange=e=>{const f=e.target.files[0];if(f){pushUndo();fileToSrc(f,setArtlist);}e.target.value="";};
 function fileToSrc(file,cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(file); }
 
 $("heightRange").oninput=()=>{L().hPct=+$("heightRange").value;$("hVal").textContent=L().hPct+"% ("+Math.round(baseH())+"px)";redraw();};
@@ -549,10 +541,9 @@ $("applyAllBtn").onclick=()=>{ pushUndo(); const c=L(); const al=c.align==="free
   toast("הפריסה הוחלה על כל הפורמטים (מרווחי הגייד לכל פורמט)"); };
 
 $("resetBtn").onclick=()=>{ if(!confirm("לאפס הכל? (לוגו Artlist יישאר)"))return; pushUndo();
-  const keep=localStorage.getItem("artlistLogo")||ARTLIST_LOGO;
   state.logos=[];state.darks=[];state.sel={type:null,id:null};
   state.layouts={"16:9":guideLayout("16:9"),"1:1":guideLayout("1:1"),"9:16":guideLayout("9:16")};
-  addLogoFromSrc(keep,"Artlist","artlist"); syncControls(); buildDarkList(); buildDarkProps(); };
+  addLogoFromSrc(ARTLIST_LOGO,"Artlist","artlist"); syncControls(); buildDarkList(); buildDarkProps(); };
 
 /* background */
 $("bgToggle").onchange=updateBg;
@@ -627,7 +618,7 @@ if(loadState()){ [...$("formatSeg").children].forEach(b=>b.classList.toggle("act
   syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
 } else {
   syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
-  addLogoFromSrc(localStorage.getItem("artlistLogo")||ARTLIST_LOGO,"Artlist","artlist");
+  addLogoFromSrc(ARTLIST_LOGO,"Artlist","artlist");
 }
 $("brandLogo").src=ARTLIST_LOGO;
 stage.dataset.bg="#000000"; updateBg();

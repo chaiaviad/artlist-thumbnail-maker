@@ -63,9 +63,8 @@
   .align2 button{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;padding:9px 4px}
   .align2 button.active{background:var(--accent);color:#111;border-color:var(--accentB)}
   .align2 button:hover{border-color:var(--accent)}
-  .alignrow{display:flex;gap:5px;direction:ltr;align-items:center}
-  .alignrow .sep{flex:0 0 1px;align-self:stretch;background:var(--line);margin:0 3px}
-  .alignrow button{flex:1;display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--muted);padding:0;cursor:pointer}
+  .alignrow{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;direction:ltr}
+  .alignrow button{display:flex;align-items:center;justify-content:center;height:34px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--muted);padding:0;cursor:pointer}
   .alignrow button:hover{border-color:var(--accent);color:var(--txt)}
   .alignrow button.active{background:var(--accent);color:#111;border-color:var(--accentB)}
   .alignrow svg{width:17px;height:17px;display:block}
@@ -193,7 +192,6 @@
           <button data-h="l" title="יישור לשמאל"><svg viewBox="0 0 24 24"><line x1="3" y1="2" x2="3" y2="22"/><rect x="5" y="7" width="12" height="10"/></svg></button>
           <button data-h="c" title="מרכוז אופקי"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><rect x="6" y="7" width="12" height="10"/></svg></button>
           <button data-h="r" title="יישור לימין"><svg viewBox="0 0 24 24"><line x1="21" y1="2" x2="21" y2="22"/><rect x="7" y="7" width="12" height="10"/></svg></button>
-          <span class="sep"></span>
           <button data-v="t" title="יישור למעלה"><svg viewBox="0 0 24 24"><line x1="2" y1="3" x2="22" y2="3"/><rect x="7" y="5" width="10" height="12"/></svg></button>
           <button data-v="c" title="מרכוז אנכי"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/><rect x="7" y="6" width="10" height="12"/></svg></button>
           <button data-v="b" title="יישור למטה"><svg viewBox="0 0 24 24"><line x1="2" y1="21" x2="22" y2="21"/><rect x="7" y="7" width="10" height="12"/></svg></button>

@@ -87,6 +87,8 @@
   .logoItem select{width:100%;flex-basis:100%}
   .logoRow{flex-direction:column;align-items:stretch}
   .logoRowTop{display:flex;align-items:center;gap:8px;width:100%}
+  .dragHandle{cursor:grab;color:var(--muted);font-size:15px;line-height:1;flex:0 0 auto;user-select:none;-webkit-user-drag:element}
+  .dragHandle:active{cursor:grabbing}
   .logoEdit{display:flex;flex-direction:column;gap:7px;width:100%;margin-top:8px;padding-top:9px;border-top:1px solid var(--line)}
   .logoEdit .field{font-size:11px}
   .logoEdit .v{color:var(--txt);font-weight:700}
@@ -446,7 +448,7 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
   const f=F();
   state.logos.forEach((l,i)=>{ const row=document.createElement("div"); row.className="logoItem logoRow"+(sel("logo",l.id)?" sel":"");
     const top=document.createElement("div"); top.className="logoRowTop";
-    top.innerHTML=`<div class="thumb"><img src="${l.src}"></div><span class="nm">${l.name}</span>`+(l.tag==="artlist"?`<span class="tagbadge">Artlist</span>`:``)+`<button class="mini" data-a="del" title="הסר">✕</button>`;
+    top.innerHTML=`<span class="dragHandle" title="גרור לסידור מחדש">⠿</span><div class="thumb"><img src="${l.src}" draggable="false"></div><span class="nm">${l.name}</span>`+(l.tag==="artlist"?`<span class="tagbadge">Artlist</span>`:``)+`<button class="mini" data-a="del" title="הסר">✕</button>`;
     top.querySelector(".thumb").onclick=()=>{state.sel={type:"logo",id:l.id};redraw();buildLogoList();};
     top.querySelector(".nm").onclick=()=>{state.sel={type:"logo",id:l.id};redraw();buildLogoList();};
     top.querySelector('[data-a=del]').onclick=()=>{pushUndo();removeLogo(l.id);};
@@ -471,8 +473,8 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
       ed.querySelector(".eReset").onclick=()=>{ pushUndo(); l.dxPct=0; l.dyPct=0; redraw(); buildLogoList(); };
       row.appendChild(ed);
     }
-    row.draggable=true; row.style.cursor="grab";
-    row.addEventListener("dragstart",ev=>{ if(ev.target.closest(".logoEdit")){ev.preventDefault();return;} dragIdx=i;ev.dataTransfer.effectAllowed="move";});
+    const handle=top.querySelector(".dragHandle"); handle.draggable=true;
+    handle.addEventListener("dragstart",ev=>{ dragIdx=i; ev.dataTransfer.effectAllowed="move"; });
     row.addEventListener("dragover",ev=>ev.preventDefault());
     row.addEventListener("drop",ev=>{ev.preventDefault();if(dragIdx==null||dragIdx===i)return;pushUndo();const ls=state.logos;const [m]=ls.splice(dragIdx,1);ls.splice(i,0,m);dragIdx=null;redraw();buildLogoList();});
     box.appendChild(row); });

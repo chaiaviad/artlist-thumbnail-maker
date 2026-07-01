@@ -173,6 +173,14 @@
         <div class="hint">אפשר גם לגרור קבצים לכאן (Drag&amp;Drop), להדביק תמונה/SVG עם Ctrl+V, או להדביק כתובת תמונה.</div>
       </div>
 
+      <div class="group" id="logoProps" style="display:none">
+        <h3>עריכת הלוגו הנבחר</h3>
+        <label class="field">גודל הלוגו: <span id="lsizeVal"></span>
+          <input type="range" id="lsizeRange" min="20" max="400" step="1"></label>
+        <div class="hint">גרור את הלוגו על הבמה כדי למקם אותו בנפרד (Alt לביטול הצמדה). שנה גודל גם בגרירת הפינות.</div>
+        <button class="btn wide" id="lposReset">↺ איפוס מיקום הלוגו</button>
+      </div>
+
       <hr>
 
       <div class="group">
@@ -253,7 +261,7 @@ function addLogoFromSrc(src,name,tag){
   const img=new Image();
   img.onload=()=>{
     const bg=hasBackground(img);
-    state.logos.push({id:state.uid++,name:name||"לוגו",src,natW:img.naturalWidth||300,natH:img.naturalHeight||120,tag:tag||"partner",hf:1,bg});
+    state.logos.push({id:state.uid++,name:name||"לוגו",src,natW:img.naturalWidth||300,natH:img.naturalHeight||120,tag:tag||"partner",hf:1,dxPct:0,dyPct:0,bg});
     reorderLogos(); redraw(); buildLogoList(); toast(bg?"⚠ ללוגו יש רקע — עדיף קובץ שקוף (PNG/SVG)":"לוגו נוסף");
   };
   img.onerror=()=>toast("שגיאה בטעינת התמונה");
@@ -325,25 +333,37 @@ function drawScrim(ctx,d,W,H){
   ctx.restore();
 }
 
+/* ---------- persistence (survives page refresh) ---------- */
+const SAVEKEY="collabState_v1"; let saveT;
+function saveState(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(SAVEKEY,JSON.stringify({logos:state.logos,layouts:state.layouts,darks:state.darks,format:state.format,uid:state.uid})); }catch(e){} },400); }
+function loadState(){ try{ const s=localStorage.getItem(SAVEKEY); if(!s)return false; const o=JSON.parse(s); if(!o||!Array.isArray(o.logos)||!o.logos.length)return false;
+  state.logos=o.logos; if(o.layouts)state.layouts=o.layouts; state.darks=o.darks||[]; state.format=o.format||"16:9"; state.uid=o.uid||state.uid; return true; }catch(e){ return false; } }
+
 /* ---------- render ---------- */
 function redraw(){
-  const s=state.scale, lay=L(), box=groupBox(), pos=groupPos();
+  const s=state.scale, lay=L(), box=groupBox(), pos=groupPos(), f=F();
   stage.querySelectorAll(".el,.divline,.scrim,.snapline,.guideline").forEach(n=>n.remove());
   state.darks.forEach(d=>{ const n=document.createElement("div"); n.className="scrim"; n.style.background=scrimCSS(d); stage.appendChild(n); });
   let cx=pos.x; const gap=baseH()*(L().gapPct/100);
-  state.logos.forEach((l,i)=>{ const w=logoW(l),h=logoH(l),y=pos.y+(box.h-h)/2;
+  state.logos.forEach((l,i)=>{ const w=logoW(l),h=logoH(l),lx=cx+(l.dxPct||0)*f.w,y=pos.y+(box.h-h)/2+(l.dyPct||0)*f.h;
     const n=document.createElement("div"); n.className="el"+(sel("logo",l.id)?" sel":"");
-    n.style.cssText=`left:${cx*s}px;top:${y*s}px;width:${w*s}px;height:${h*s}px`;
+    n.style.cssText=`left:${lx*s}px;top:${y*s}px;width:${w*s}px;height:${h*s}px`;
     n.dataset.kind="logo"; n.dataset.id=l.id;
     const im=document.createElement("img"); im.src=l.src; n.appendChild(im);
     if(sel("logo",l.id)) ["tl","tr","bl","br"].forEach(p=>{const hd=document.createElement("div");hd.className="handle "+p;hd.dataset.h=p;n.appendChild(hd);});
     stage.appendChild(n);
-    if(lay.divider && i<state.logos.length-1){ const lh=box.h*.62,lw=Math.max(2,box.h*.02),lx=cx+w+gap/2-lw/2,ly=pos.y+(box.h-lh)/2;
+    if(lay.divider && i<state.logos.length-1){ const lh=box.h*.62,lw=Math.max(2,box.h*.02),ldx=cx+w+gap/2-lw/2,ly=pos.y+(box.h-lh)/2;
       const dl=document.createElement("div"); dl.className="divline";
-      dl.style.cssText=`left:${lx*s}px;top:${ly*s}px;width:${lw*s}px;height:${lh*s}px`; stage.appendChild(dl); }
+      dl.style.cssText=`left:${ldx*s}px;top:${ly*s}px;width:${lw*s}px;height:${lh*s}px`; stage.appendChild(dl); }
     cx+=w+gap;
   });
+  if(state.sel.type==="logo"){ const sl=state.logos.find(x=>x.id===state.sel.id), r=$("lsizeRange"); if(sl&&r){ r.value=Math.round(sl.hf*100); $("lsizeVal").textContent=Math.round(sl.hf*100)+"%"; } }
+  saveState();
 }
+// auto (lockup) slot of a logo, ignoring its per-logo offset
+function logoSlot(l){ const pos=groupPos(),box=groupBox(),gap=baseH()*(L().gapPct/100); let cx=pos.x;
+  for(const it of state.logos){ const w=logoW(it),h=logoH(it); if(it===l) return {x:cx,y:pos.y+(box.h-h)/2,w,h}; cx+=w+gap; }
+  const w=logoW(l),h=logoH(l); return {x:pos.x,y:pos.y,w,h}; }
 function sel(type,id){ return state.sel.type===type&&state.sel.id===id; }
 
 function fitStage(){ const f=F(),pad=48;
@@ -359,7 +379,7 @@ stage.addEventListener("pointerdown",e=>{
   const id=+node.dataset.id, l=state.logos.find(x=>x.id===id);
   state.sel={type:"logo",id};
   if(hEl){ drag={mode:"resize",l,up:hEl.dataset.h.includes("t"),sy:e.clientY,oh:logoH(l),committed:false}; }
-  else { const p=groupPos(); drag={mode:"move",sx:e.clientX,sy:e.clientY,ox:p.x,oy:p.y,committed:false}; }
+  else { drag={mode:"move",l,sx:e.clientX,sy:e.clientY,odxp:l.dxPct||0,odyp:l.dyPct||0,committed:false}; }
   redraw(); buildLogoList(); e.preventDefault();
 });
 function drawSnaplines(lineX,lineY){ stage.querySelectorAll(".snapline").forEach(n=>n.remove()); const s=state.scale;
@@ -373,18 +393,16 @@ window.addEventListener("pointermove",e=>{ if(!drag)return;
   if(!drag.committed){ pushUndo(); drag.committed=true; }
   const s=state.scale,dx=(e.clientX-drag.sx)/s,dy=(e.clientY-drag.sy)/s;
   let lineX=null,lineY=null;
-  if(drag.mode==="move"){ const lay=L(),f=F(),box=groupBox(),gm=guideSafe(state.format); let nx=drag.ox+dx, ny=drag.oy+dy;
+  if(drag.mode==="move"){ const l=drag.l,f=F(),gm=guideSafe(state.format),slot=logoSlot(l),bw=slot.w,bh=slot.h;
+    let ax=slot.x+drag.odxp*f.w+dx, ay=slot.y+drag.odyp*f.h+dy;
     if(!e.altKey){ const thr=8/s;
       const xT=[{e:0,v:gm.mx},{e:.5,v:f.w/2},{e:1,v:f.w-gm.mx}];
-      for(const t of xT){ if(Math.abs((nx+box.w*t.e)-t.v)<thr){ nx=t.v-box.w*t.e; lineX=t.v; break; } }
+      for(const t of xT){ if(Math.abs((ax+bw*t.e)-t.v)<thr){ ax=t.v-bw*t.e; lineX=t.v; break; } }
       const yT=[{e:0,v:gm.my},{e:.5,v:f.h/2},{e:1,v:f.h-gm.my}];
-      for(const t of yT){ if(Math.abs((ny+box.h*t.e)-t.v)<thr){ ny=t.v-box.h*t.e; lineY=t.v; break; } }
+      for(const t of yT){ if(Math.abs((ay+bh*t.e)-t.v)<thr){ ay=t.v-bh*t.e; lineY=t.v; break; } }
     }
-    // clamp inside the official guide safe-zone — the lockup can't get closer to any edge than the guide
-    const maxX=f.w-box.w-gm.mx, maxY=f.h-box.h-gm.my;
-    nx=(maxX<gm.mx)?(f.w-box.w)/2:Math.max(gm.mx,Math.min(maxX,nx));
-    ny=(maxY<gm.my)?(f.h-box.h)/2:Math.max(gm.my,Math.min(maxY,ny));
-    lay.align="free"; lay.x=Math.round(nx); lay.y=Math.round(ny); clearAlignUI();
+    ax=Math.max(0,Math.min(f.w-bw,ax)); ay=Math.max(0,Math.min(f.h-bh,ay));
+    l.dxPct=(ax-slot.x)/f.w; l.dyPct=(ay-slot.y)/f.h;
   } else { const newH=Math.max(10,drag.oh+(drag.up?-dy:dy)); drag.l.hf=newH/baseH(); }
   redraw();
   if(drag.mode==="move"){ drawGuides(); drawSnaplines(lineX,lineY); }
@@ -400,6 +418,7 @@ window.addEventListener("keydown",e=>{
 /* ---------- left panels ---------- */
 function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
   const ab=$("addArtlist"); if(ab)ab.style.display=state.logos.some(l=>l.tag==="artlist")?"none":"block";
+  buildLogoProps();
   if(!state.logos.length){ box.innerHTML='<div class="empty">אין לוגואים</div>'; return; }
   state.logos.forEach((l,i)=>{ const row=document.createElement("div"); row.className="logoItem"+(sel("logo",l.id)?" sel":"");
     row.innerHTML=`<div class="thumb"><img src="${l.src}"></div><span class="nm">${l.name}</span>
@@ -421,6 +440,13 @@ function buildLogoList(){ const box=$("logoList"); box.innerHTML="";
 }
 function swap(i,j){ const ls=state.logos; if(j<0||j>=ls.length)return; [ls[i],ls[j]]=[ls[j],ls[i]]; redraw(); buildLogoList(); }
 function removeLogo(id){ state.logos=state.logos.filter(l=>l.id!==id); if(sel("logo",id))state.sel={type:null,id:null}; redraw(); buildLogoList(); }
+/* ---------- per-logo edit panel ---------- */
+function selLogo(){ return state.sel.type==="logo"?state.logos.find(x=>x.id===state.sel.id):null; }
+function buildLogoProps(){ const l=selLogo(), box=$("logoProps"); if(!box)return;
+  box.style.display=l?"flex":"none"; if(!l)return; $("lsizeRange").value=Math.round(l.hf*100); $("lsizeVal").textContent=Math.round(l.hf*100)+"%"; }
+$("lsizeRange").oninput=()=>{ const l=selLogo(); if(!l)return; l.hf=+$("lsizeRange").value/100; $("lsizeVal").textContent=$("lsizeRange").value+"%"; redraw(); };
+$("lsizeRange").addEventListener("pointerdown",pushUndo);
+$("lposReset").onclick=()=>{ const l=selLogo(); if(!l)return; pushUndo(); l.dxPct=0; l.dyPct=0; redraw(); toast("מיקום הלוגו אופס"); };
 
 /* ---------- right: dark list + props ---------- */
 function buildDarkList(){ const box=$("darkList"); box.innerHTML="";
@@ -525,8 +551,8 @@ async function renderFormat(fmt){ const f=FORMATS[fmt], lay=state.layouts[fmt];
   let px,py; const mx=f.w*(lay.mxPct/100), my=f.h*(lay.myPct/100);
   if(lay.align==="free"&&lay.x!=null){px=lay.x;py=lay.y;} else { const X={l:mx,c:(f.w-bw)/2,r:f.w-bw-mx},Y={t:my,c:(f.h-bh)/2,b:f.h-bh-my}; px=X[lay.align[0]];py=Y[lay.align[1]]; }
   let cx=px;
-  for(let i=0;i<state.logos.length;i++){ const l=state.logos[i],h=base*l.hf,w=h*(l.natW/l.natH),y=py+(bh-h)/2;
-    await drawImg(ctx,l.src,cx,y,w,h);
+  for(let i=0;i<state.logos.length;i++){ const l=state.logos[i],h=base*l.hf,w=h*(l.natW/l.natH),y=py+(bh-h)/2+(l.dyPct||0)*f.h,lx=cx+(l.dxPct||0)*f.w;
+    await drawImg(ctx,l.src,lx,y,w,h);
     if(lay.divider&&i<state.logos.length-1){const lh=bh*.62,lw=Math.max(2,bh*.02),lx=cx+w+gap/2-lw/2,ly=py+(bh-lh)/2;ctx.fillStyle="#fff";ctx.fillRect(lx,ly,lw,lh);}
     cx+=w+gap; }
   return cv;
@@ -548,8 +574,12 @@ function syncControls(){ const lay=L();
   $("myRange").value=lay.myPct;$("myVal").textContent=lay.myPct+"%";
   $("divToggle").checked=lay.divider; markAlignUI();
 }
-syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
-addLogoFromSrc(localStorage.getItem("artlistLogo")||ARTLIST_LOGO,"Artlist","artlist");
+if(loadState()){ [...$("formatSeg").children].forEach(b=>b.classList.toggle("active",b.dataset.f===state.format));
+  syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
+} else {
+  syncControls(); fitStage(); buildLogoList(); buildDarkList(); buildDarkProps();
+  addLogoFromSrc(localStorage.getItem("artlistLogo")||ARTLIST_LOGO,"Artlist","artlist");
+}
 $("brandLogo").src=ARTLIST_LOGO;
 stage.dataset.bg="#000000"; updateBg();
 if(!localStorage.getItem("collabApplyTipSeen")){ const tip=$("applyTip");

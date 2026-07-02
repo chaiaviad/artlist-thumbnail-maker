@@ -1,0 +1,3269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Depth Gradient Motion</title>
+<style>
+/* External Google Fonts import removed for internal / no-external-access build.
+   Falls back to system UI fonts (declared in font-family stacks below). */
+
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0b0c0f;
+  --panel: #15161a;
+  --panel2: #1c1d22;
+  --line: rgba(255,255,255,.10);
+  --line2: rgba(255,255,255,.06);
+  --line3: rgba(255,255,255,.16);
+  --txt: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.58);
+  --dim: rgba(255,255,255,.36);
+  --accent: #ff9f0a;
+  --abg: rgba(255,159,10,.13);
+  --aline: rgba(255,159,10,.48);
+  --green: #30d158;
+  --gbg: rgba(48,209,88,.13);
+  --gline: rgba(48,209,88,.40);
+  --red: #ff453a;
+  --rbg: rgba(255,69,58,.14);
+  --rline: rgba(255,69,58,.45);
+  --blue: #5e9eff;
+  --radius: 12px;
+  --panel-w: 430px;
+  --focus: 0 0 0 2px rgba(255,159,10,.28);
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  appearance: none;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(460px, 1fr) minmax(320px, var(--panel-w));
+  gap: 10px;
+  padding: 10px;
+}
+
+#left {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+#preview {
+  min-height: 0;
+  background: #07080a;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+  padding: 12px;
+}
+
+#preview.drag,
+#preview.drop-ready {
+  border-color: var(--accent);
+  background: #101216;
+  box-shadow: 0 0 0 1px var(--aline) inset;
+}
+
+#renderCanvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  background: #000;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 14px 42px rgba(0,0,0,.42);
+  image-rendering: auto;
+}
+
+#emptyState {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+#emptyState strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--txt);
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+#emptyState span {
+  line-height: 1.45;
+}
+
+#emptyState.hidden {
+  display: none;
+}
+
+.hidden {
+  display: none;
+}
+
+#previewBadge {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 28px);
+}
+
+.badge {
+  border: 1px solid var(--line2);
+  background: rgba(12,13,16,.82);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.badge.on {
+  color: var(--accent);
+  border-color: var(--aline);
+  background: var(--abg);
+}
+
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  background: rgba(10,10,12,.92);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 13px;
+  color: var(--txt);
+  opacity: 0;
+  transition: opacity .16s;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: .04em;
+}
+
+#toast.show {
+  opacity: 1;
+}
+
+#right {
+  min-width: 0;
+  min-height: 0;
+  height: calc(100vh - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+#rightHead {
+  flex: 0 0 auto;
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.012);
+}
+
+#rightHead h1 {
+  margin: 0 0 6px;
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.1;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+#rightHead p {
+  max-width: none;
+  color: var(--dim);
+  font-size: 9.2px;
+  line-height: 1.35;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.flatControls {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 0 64px;
+}
+
+.flatControls::-webkit-scrollbar {
+  width: 4px;
+}
+
+.flatControls::-webkit-scrollbar-thumb {
+  background: var(--line3);
+  border-radius: 4px;
+}
+
+.flatSec {
+  border: 0;
+  border-bottom: 1px solid var(--line2);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.flatHead {
+  min-height: 36px;
+  padding: 9px 14px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: transparent;
+}
+
+.flatHead strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.headRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.headRight > span {
+  font-size: 9px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.secIcon {
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  border: 1px solid var(--aline);
+  background: var(--abg);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.collapseBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.02);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.collapseBtn:hover {
+  color: var(--accent);
+  border-color: var(--aline);
+  background: var(--abg);
+}
+
+.flatBody {
+  padding: 0 14px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow: visible;
+}
+
+.sectionBody.isCollapsed {
+  display: none;
+}
+
+.flatGrid {
+  display: grid;
+  gap: 7px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.flatGrid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.flatGrid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.flatGrid.noPad {
+  padding: 0;
+  margin: 0;
+}
+
+.flatField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.lr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 16px;
+  gap: 8px;
+}
+
+.lb {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 9.2px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vl {
+  flex: 0 0 auto;
+  min-width: auto;
+  color: var(--accent);
+  font-size: 9.2px;
+  font-weight: 900;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mainBtn,
+.toggleBtn,
+.chip,
+.presetBtn,
+.selectInput,
+.textInput,
+.numberInput {
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mainBtn,
+.toggleBtn {
+  height: 30px;
+  border-radius: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  font-size: 9.2px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mainBtn:hover,
+.toggleBtn:hover {
+  background: rgba(255,255,255,.08);
+  color: var(--txt);
+}
+
+.mainBtn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #171105;
+}
+
+.mainBtn.playBtn {
+  height: 40px;
+  font-size: 11px;
+  letter-spacing: .09em;
+  background: var(--green);
+  border-color: transparent;
+  color: #06210f;
+}
+.mainBtn.playBtn:hover {
+  background: var(--green);
+  color: #06210f;
+  filter: brightness(1.08);
+}
+.mainBtn.playBtn.on {
+  background: var(--accent);
+  color: #171105;
+}
+.mainBtn.playBtn .btnIcon {
+  font-size: 12px;
+}
+
+.mainBtn.green {
+  background: var(--gbg);
+  border-color: var(--gline);
+  color: var(--green);
+}
+
+.mainBtn.red {
+  background: var(--rbg);
+  border-color: var(--rline);
+  color: #ff8d86;
+}
+
+.mainBtn:disabled,
+.toggleBtn:disabled,
+.chip:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.btnIcon {
+  flex: 0 0 auto;
+  margin-right: 4px;
+  font-weight: 900;
+}
+
+.selectInput,
+.textInput,
+.numberInput {
+  width: 100%;
+  height: 31px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.045);
+  color: var(--txt);
+  font-size: 10.2px;
+  font-weight: 800;
+  padding: 0 8px;
+  outline: none;
+}
+
+.textInput {
+  text-transform: uppercase;
+}
+
+.numberInput {
+  color: var(--accent);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.numberInput::-webkit-inner-spin-button,
+.numberInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.numberInput {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type=range] {
+  width: 100%;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0b0c0f;
+  cursor: pointer;
+}
+
+input[type=range]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0b0c0f;
+  cursor: pointer;
+}
+
+.chips.segmented,
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chips.segmented {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  width: 100%;
+}
+
+.chip {
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  padding: 0 8px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--txt);
+  background: rgba(255,255,255,.08);
+}
+
+.chip.on {
+  color: var(--accent);
+  border-color: var(--aline);
+  background: var(--abg);
+}
+
+.nativeFileInput {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.uploadLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  overflow: hidden;
+  border: 1px solid var(--line2);
+}
+
+.bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width .12s;
+}
+
+#status {
+  min-height: 0;
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+#status.error {
+  color: #ff8d86;
+}
+
+.smallMono {
+  font-family: "Space Mono", ui-monospace, monospace;
+  color: var(--dim);
+  font-size: 8.8px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.flatPresets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.presetBtn {
+  height: 29px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  padding: 0 8px;
+  font-size: 9px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.presetBtn:hover {
+  color: var(--txt);
+  background: rgba(255,255,255,.08);
+}
+
+.presetBtn.on {
+  color: var(--accent);
+  border-color: var(--aline);
+  background: var(--abg);
+}
+
+.presetSwatch {
+  width: 30px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  flex: 0 0 auto;
+}
+
+.gradientBarWrap {
+  position: relative;
+  height: 70px;
+  padding: 9px 10px 26px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  border-radius: 9px;
+  user-select: none;
+  overflow: visible;
+}
+
+.gradientBarWrap.drop-delete {
+  border-color: var(--rline);
+  background: var(--rbg);
+}
+
+#gradientBar {
+  position: relative;
+  height: 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.22);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+  cursor: copy;
+}
+
+#stopLayer {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 9px;
+  bottom: 10px;
+}
+
+.stopHandle {
+  position: absolute;
+  top: 28px;
+  width: 18px;
+  height: 20px;
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.stopHandle:active {
+  cursor: grabbing;
+}
+
+.stopHandle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -11px;
+  width: 2px;
+  height: 11px;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,.75);
+}
+
+.stopHandle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--stop-color, #fff);
+  border: 2px solid #0b0c0f;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.5), 0 4px 14px rgba(0,0,0,.45);
+  border-radius: 3px;
+}
+
+.stopHandle.selected::after {
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(0,0,0,.55);
+}
+
+.stopHandle.deleting {
+  opacity: .55;
+}
+
+.stopHandle.deleting::after {
+  box-shadow: 0 0 0 2px var(--red), 0 4px 16px rgba(0,0,0,.55);
+}
+
+.deleteHint {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  color: rgba(255,255,255,.30);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: center;
+  pointer-events: none;
+}
+
+.gradientBarWrap.drop-delete .deleteHint {
+  color: #ff8d86;
+}
+
+.stopRowFlat {
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+
+.colorInput {
+  width: 100%;
+  height: 31px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.colorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorInput::-webkit-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+.colorInput::-moz-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+.flatDetails {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  padding: 0;
+  margin: 0;
+}
+
+.flatDetails summary {
+  height: 29px;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.flatDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.flatDetails summary::before {
+  content: "+";
+  width: 16px;
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.flatDetails[open] summary {
+  color: var(--accent);
+}
+
+.flatDetails[open] summary::before {
+  content: "−";
+}
+
+.flatDetails .flatGrid {
+  padding-top: 2px;
+}
+
+#lookMotionSection .mainBtn {
+  width: 100%;
+}
+
+#exportSection .chips {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+#exportSection .chip {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  #app {
+    grid-template-columns: minmax(420px, 1fr) minmax(320px, 400px);
+  }
+
+  .flatGrid.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  html,
+  body {
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+  }
+
+  #app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    height: auto;
+  }
+
+  #left {
+    min-height: 58vh;
+  }
+
+  #right {
+    height: auto;
+    min-height: 0;
+  }
+
+  .flatGrid.two,
+  .flatGrid.three,
+  .stopRowFlat {
+    grid-template-columns: 1fr;
+  }
+}
+
+.toggleBtn.on {
+  color: var(--accent);
+  border-color: var(--aline);
+  background: var(--abg);
+}
+#preview.pickingColor {
+  cursor: crosshair;
+}
+
+
+/* ---- V16: mouse-drag parallax preview ---- */
+#renderCanvas {
+  transform-origin: center center;
+  will-change: transform;
+}
+#preview.parallaxReady #renderCanvas {
+  cursor: grab;
+}
+#preview.parallaxDragging #renderCanvas {
+  cursor: grabbing;
+}
+#preview.parallaxDragging {
+  border-color: var(--aline);
+}
+
+
+/* ---- V17: stronger 3D drag + button clipping fixes ---- */
+:root {
+  --panel-w: 500px;
+}
+
+.mainBtn,
+.toggleBtn {
+  min-height: 31px;
+  font-size: 9.4px;
+  letter-spacing: .035em;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.flatGrid.three {
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+}
+
+.flatGrid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#lookMotionSection .flatGrid.two.noPad {
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+}
+
+.chips.segmented {
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+}
+
+.btnIcon {
+  margin-right: 3px;
+}
+
+#renderCanvas {
+  transform-origin: center center;
+  will-change: transform;
+}
+
+#preview.parallaxReady #renderCanvas {
+  cursor: grab;
+}
+
+#preview.parallaxDragging #renderCanvas {
+  cursor: grabbing;
+}
+
+#preview.parallaxDragging {
+  border-color: var(--aline);
+}
+
+@media (max-width: 1180px) {
+  #app {
+    grid-template-columns: minmax(420px, 1fr) minmax(360px, 480px);
+  }
+}
+
+@media (max-width: 920px) {
+  .flatGrid.two,
+  .flatGrid.three,
+  .stopRowFlat {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ---- V18: fit-to-view preview zoom + relief extrusion ---- */
+#preview {
+  padding: 14px;
+}
+#renderCanvas {
+  max-width: none;
+  max-height: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  will-change: width, height, transform;
+}
+#preview.zooming #renderCanvas {
+  cursor: zoom-in;
+}
+#preview.parallaxReady #renderCanvas {
+  cursor: grab;
+}
+#preview.parallaxDragging #renderCanvas {
+  cursor: grabbing;
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="left">
+    <div id="preview">
+      <canvas id="renderCanvas"></canvas>
+      <div id="emptyState"><div><strong>Drop an image, video, or camera feed to begin</strong><span>Estimate a depth map, edit an Illustrator-style gradient bar, animate the color mapping, then export PNG or video.</span></div></div>
+      <div id="previewBadge">
+        <span class="badge" id="mediaBadge">No Source</span>
+        <span class="badge" id="depthBadge">No Depth</span>
+        <span class="badge" id="motionBadge">Motion Off</span>
+      </div>
+      <div id="toast"></div>
+    </div>
+  </section>
+
+  <aside id="right">
+    <div id="rightHead">
+      <h1>Depth Gradient Motion</h1>
+      <p>Depth-based gradient color mapping for image, video, and camera input.</p>
+    </div>
+    
+    
+    
+        
+    <div id="controls" class="flatControls">
+      <section class="section flatSec" id="sourceSection">
+        <div class="sectionHead flatHead">
+          <strong><span class="secIcon">◉</span>Source</strong>
+          <div class="headRight">
+            <span>Input + Depth</span>
+            <button class="collapseBtn" type="button" data-target="sourceSectionBody" aria-expanded="true" aria-label="Collapse Source">−</button>
+          </div>
+        </div>
+        <div class="sectionBody flatBody" id="sourceSectionBody">
+          <div class="flatGrid three">
+            <label class="mainBtn uploadLabel" id="uploadBtn" for="fileInput"><span class="btnIcon">↑</span>File</label>
+            <input id="fileInput" class="nativeFileInput" type="file" accept="image/*,video/*">
+            <button class="mainBtn" id="cameraBtn" type="button"><span class="btnIcon">●</span>Camera</button>
+            <button class="mainBtn" id="stopCameraBtn" disabled><span class="btnIcon">■</span>Stop</button>
+          </div>
+          <div class="flatGrid three">
+            <button class="mainBtn primary" id="estimateBtn" disabled><span class="btnIcon">◆</span>Estimate</button>
+            <button class="mainBtn" id="reestimateBtn" disabled><span class="btnIcon">◇</span>Frame</button>
+            <button class="mainBtn" id="mediaPlayBtn" disabled><span class="btnIcon">▶</span>Source</button>
+          </div>
+          <details class="flatDetails">
+            <summary>Depth &amp; settings files</summary>
+            <div class="flatGrid two">
+              <button class="toggleBtn" id="depthExportBtn" type="button">Depth PNG</button>
+              <label class="toggleBtn uploadLabel" for="depthImportInput">Load Depth</label>
+              <input id="depthImportInput" class="nativeFileInput" type="file" accept="image/*">
+              <button class="toggleBtn" id="settingsExportBtn" type="button">Save JSON</button>
+              <label class="toggleBtn uploadLabel" for="settingsImportInput">Load JSON</label>
+              <input id="settingsImportInput" class="nativeFileInput" type="file" accept="application/json,.json">
+            </div>
+          </details>
+          <div class="flatField" id="mediaTimeWrap">
+            <div class="lr"><span class="lb">Source Time</span><span class="vl" id="mediaTimeVal">0:00 / 0:00</span></div>
+            <input type="range" id="mediaTime" min="0" max="1000" value="0">
+          </div>
+          <div class="progress"><div class="bar" id="progressBar"></div></div>
+          <div id="status">Choose an image/video, or use camera. Camera works best from localhost or HTTPS.</div>
+          <div class="smallMono" id="fileMeta">No source loaded.</div>
+        </div>
+      </section>
+
+      <section class="section flatSec" id="lookMotionSection">
+        <div class="sectionHead flatHead">
+          <strong><span class="secIcon">〰</span>Look + Motion</strong>
+          <div class="headRight">
+            <span>Preview + Animation</span>
+            <button class="collapseBtn" type="button" data-target="lookMotionSectionBody" aria-expanded="true" aria-label="Collapse Look + Motion">−</button>
+          </div>
+        </div>
+        <div class="sectionBody flatBody" id="lookMotionSectionBody">
+          <div class="flatField">
+            <span class="lb">Preview</span>
+            <div class="chips segmented" id="viewChips">
+              <button class="chip" data-view="source">Source</button>
+              <button class="chip" data-view="depth">Depth</button>
+              <button class="chip on" data-view="result">Result</button>
+            </div>
+          </div>
+
+          <div class="flatGrid two">
+            <div class="flatField">
+              <div class="lr"><span class="lb">Resolution</span><span class="vl" id="qualityVal">2160px</span></div>
+              <select id="qualitySelect" class="selectInput">
+                <option value="1080">1080 Fast</option>
+                <option value="1440">1440 Balanced</option>
+                <option value="2160" selected>2160 High</option>
+                <option value="3072">3072 Ultra</option>
+              </select>
+            </div>
+            <div class="flatField">
+              <div class="lr"><span class="lb">Blend</span><span class="vl" id="blendVal">100%</span></div>
+              <input type="range" id="blendRange" min="0" max="100" value="100" data-default="100">
+            </div>
+          </div>
+
+          <div class="flatField">
+            <div class="lr"><span class="lb">Motion</span><span class="vl" id="motionStateVal">Off</span></div>
+            <button class="mainBtn playBtn" id="motionPlayBtn" type="button"><span class="btnIcon">▶</span>Play</button>
+          </div>
+          <div class="flatField">
+            <div class="lr"><span class="lb">Speed</span><span class="vl" id="speedVal">0.35 cps</span></div>
+            <input type="range" id="speedRange" min="0" max="200" value="35" data-default="35">
+          </div>
+
+          <div class="flatGrid two">
+            <div class="flatField">
+              <span class="lb">Loop</span>
+              <div class="chips segmented" id="motionModeChips">
+                <button class="chip on" data-mode="wrap" title="Smooth cyclic wrap. The seam is cross-faded so the loop does not create a hard band.">Smooth</button>
+                <button class="chip" data-mode="sine" title="Sine remap. Softer ping-pong style movement with no hard wrap seam.">Sine</button>
+              </div>
+            </div>
+            <div class="flatField">
+              <span class="lb">Color Blend</span>
+              <select id="colorSpaceSelect" class="selectInput">
+                <option value="oklab" selected>Natural</option>
+                <option value="linear">Bright</option>
+                <option value="srgb">Basic</option>
+              </select>
+            </div>
+          </div>
+
+          <details class="flatDetails">
+            <summary>More look + motion controls</summary>
+            <div class="flatGrid two">
+              <div class="flatField">
+                <div class="lr"><span class="lb">Depth Refresh</span><span class="vl" id="autoDepthVal">Off</span></div>
+                <select id="autoDepthSelect" class="selectInput">
+                  <option value="0" selected>Off</option>
+                  <option value="1000">1s</option>
+                  <option value="2000">2s</option>
+                  <option value="5000">5s</option>
+                </select>
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Contrast</span><span class="vl" id="contrastVal">125%</span></div>
+                <input type="range" id="contrastRange" min="50" max="240" value="125" data-default="125">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Brightness Hold</span><span class="vl" id="lumaVal">0%</span></div>
+                <input type="range" id="lumaRange" min="0" max="100" value="0" data-default="0">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Depth Gamma</span><span class="vl" id="gammaVal">1.00</span></div>
+                <input type="range" id="gammaRange" min="40" max="220" value="100" data-default="100">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Blend Mode</span><span class="vl" id="blendModeVal">Normal</span></div>
+                <select id="blendMode" class="selectInput">
+                  <option value="normal" selected>Normal</option>
+                  <option value="screen">Screen</option>
+                  <option value="multiply">Multiply</option>
+                  <option value="overlay">Overlay</option>
+                </select>
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Scale</span><span class="vl" id="scaleVal">1.00×</span></div>
+                <input type="range" id="scaleRange" min="25" max="400" value="100" data-default="100">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Phase</span><span class="vl" id="phaseVal">0%</span></div>
+                <input type="range" id="phaseRange" min="0" max="100" value="0" data-default="0">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Softness</span><span class="vl" id="softnessVal">0</span></div>
+                <input type="range" id="softnessRange" min="0" max="8" value="0" data-default="0">
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">3D Surface Depth</span><span class="vl" id="parallaxVal">120px</span></div>
+                <input type="range" id="parallaxRange" min="0" max="420" value="120" data-default="120">
+              </div>
+              <div class="flatField">
+                <span class="lb">Motion Direction</span>
+                <div class="chips segmented" id="directionChips">
+                  <button class="chip on" data-dir="1">Forward</button>
+                  <button class="chip" data-dir="-1">Backward</button>
+                </div>
+              </div>
+              <div class="flatGrid two noPad">
+                <button class="toggleBtn" id="ditherBtn" type="button" title="Adds tiny noise to reduce visible 8-bit banding in smooth gradients.">Banding On</button>
+                <button class="toggleBtn" id="invertBtn" type="button" title="Swap near and far depth interpretation.">Near ↔ Far</button>
+              </div>
+              <div class="flatGrid two noPad">
+                <button class="toggleBtn" id="fitBtn" type="button">Fit</button>
+                <button class="toggleBtn" id="parallaxResetBtn" type="button" title="Reset the mouse-drag 3D camera offset.">Reset 3D</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="section flatSec" id="gradientSection">
+        <div class="sectionHead flatHead">
+          <strong><span class="secIcon">▰</span>Gradient</strong>
+          <div class="headRight">
+            <span>Colors</span>
+            <button class="collapseBtn" type="button" data-target="gradientSectionBody" aria-expanded="true" aria-label="Collapse Gradient">−</button>
+          </div>
+        </div>
+        <div class="sectionBody flatBody" id="gradientSectionBody">
+          <div class="presetWrap flatPresets" id="presetWrap"></div>
+          <div class="gradientBarWrap flatGradient" id="gradientBarWrap">
+            <div id="gradientBar"></div>
+            <div id="stopLayer"></div>
+            <div class="deleteHint">Click or double-click the bar to add · drag diamond down to delete</div>
+          </div>
+          <div class="flatGrid two stopRowFlat">
+            <input id="stopColor" class="colorInput" type="color" value="#ffffff">
+            <input id="stopHex" class="textInput" type="text" value="#FFFFFF" spellcheck="false">
+          </div>
+          <div class="flatGrid two">
+            <div class="flatField">
+              <div class="lr"><span class="lb">Stop Position</span><span class="vl" id="stopPosVal">0%</span></div>
+              <input id="stopPos" type="range" min="0" max="100" value="0" data-default="0">
+            </div>
+            <div class="flatField">
+              <span class="lb">Position Number</span>
+              <input id="stopPosNum" class="numberInput" type="number" min="0" max="100" step="1" value="0">
+            </div>
+          </div>
+          <div class="flatField">
+            <div class="lr"><span class="lb">Stop Opacity</span><span class="vl" id="stopAlphaVal">100%</span></div>
+            <input id="stopAlpha" type="range" min="0" max="100" value="100" data-default="100">
+          </div>
+          <div class="flatGrid three">
+            <button id="undoGradientBtn" class="toggleBtn" type="button">Undo</button>
+            <button id="redoGradientBtn" class="toggleBtn" type="button">Redo</button>
+            <button id="sourceColorBtn" class="toggleBtn" type="button">Pick Source</button>
+            <button id="deleteStopBtn" class="toggleBtn" type="button">Delete</button>
+            <button id="sortStopsBtn" class="toggleBtn" type="button">Sort</button>
+            <button id="resetGradientBtn" class="toggleBtn" type="button">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section flatSec" id="exportSection">
+        <div class="sectionHead flatHead">
+          <strong><span class="secIcon">⇪</span>Export</strong>
+          <div class="headRight">
+            <span>Save</span>
+            <button class="collapseBtn" type="button" data-target="exportSectionBody" aria-expanded="true" aria-label="Collapse Export">−</button>
+          </div>
+        </div>
+        <div class="sectionBody flatBody" id="exportSectionBody">
+          <div class="flatGrid two">
+            <button class="mainBtn green" id="pngBtn" disabled><span class="btnIcon">↓</span>PNG</button>
+            <button class="mainBtn red" id="recordBtn" disabled><span class="btnIcon">●</span>Video</button>
+          </div>
+          <div class="flatGrid two">
+            <div class="flatField">
+              <div class="lr"><span class="lb">Format</span><span class="vl" id="formatVal">MP4*</span></div>
+              <select id="formatSelect" class="selectInput">
+                <option value="mp4" selected>MP4</option>
+                <option value="webm">WebM</option>
+              </select>
+            </div>
+            <div class="flatField">
+              <div class="lr"><span class="lb">Scale</span><span class="vl" id="exportScaleVal">1×</span></div>
+              <select id="exportScale" class="selectInput">
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="3">3×</option>
+              </select>
+            </div>
+          </div>
+          <details class="flatDetails">
+            <summary>Video options</summary>
+            <div class="flatGrid two">
+              <div class="flatField">
+                <div class="lr"><span class="lb">FPS</span><span class="vl" id="fpsVal">30</span></div>
+                <select id="fpsSelect" class="selectInput">
+                  <option value="24">24</option>
+                  <option value="30" selected>30</option>
+                  <option value="60">60</option>
+                </select>
+              </div>
+              <div class="flatField">
+                <div class="lr"><span class="lb">Duration</span><span class="vl" id="durationVal">5s</span></div>
+                <input type="range" id="durationRange" min="1" max="30" value="5" data-default="5">
+              </div>
+            </div>
+            <div class="chips"><button class="chip on" id="includeAudioBtn" type="button">Include Source Audio</button></div>
+            <div class="chips"><button class="chip" id="perfectLoopBtn" type="button">Perfect Loop</button></div>
+          </details>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<video id="sourceVideo" playsinline class="hidden"></video>
+
+<script>
+// Transformers.js is loaded lazily only when depth estimation starts.
+// This keeps upload, drag/drop, and camera controls alive even if the model CDN is unavailable.
+const MODEL_ID = 'onnx-community/depth-anything-v2-small';
+let PROCESS_MAX_SIDE = 2160;
+const $ = id => document.getElementById(id);
+const els = {
+  renderCanvas:$('renderCanvas'), preview:$('preview'), emptyState:$('emptyState'), mediaBadge:$('mediaBadge'), depthBadge:$('depthBadge'), motionBadge:$('motionBadge'), toast:$('toast'),
+  fileInput:$('fileInput'), depthImportInput:$('depthImportInput'), settingsImportInput:$('settingsImportInput'), sourceVideo:$('sourceVideo'), uploadBtn:$('uploadBtn'), cameraBtn:$('cameraBtn'), stopCameraBtn:$('stopCameraBtn'), estimateBtn:$('estimateBtn'), reestimateBtn:$('reestimateBtn'), mediaPlayBtn:$('mediaPlayBtn'), motionPlayBtn:$('motionPlayBtn'), pngBtn:$('pngBtn'), recordBtn:$('recordBtn'), fileMeta:$('fileMeta'), progressBar:$('progressBar'), status:$('status'),
+  viewChips:$('viewChips'), qualitySelect:$('qualitySelect'), qualityVal:$('qualityVal'), colorSpaceSelect:$('colorSpaceSelect'), ditherBtn:$('ditherBtn'), parallaxRange:$('parallaxRange'), parallaxVal:$('parallaxVal'), autoDepthSelect:$('autoDepthSelect'), autoDepthVal:$('autoDepthVal'), blendRange:$('blendRange'), blendVal:$('blendVal'), contrastRange:$('contrastRange'), contrastVal:$('contrastVal'), speedRange:$('speedRange'), speedVal:$('speedVal'), scaleRange:$('scaleRange'), scaleVal:$('scaleVal'), phaseRange:$('phaseRange'), phaseVal:$('phaseVal'), softnessRange:$('softnessRange'), softnessVal:$('softnessVal'), directionChips:$('directionChips'), motionModeChips:$('motionModeChips'), motionStateVal:$('motionStateVal'),
+  formatSelect:$('formatSelect'), formatVal:$('formatVal'), fpsSelect:$('fpsSelect'), fpsVal:$('fpsVal'), durationRange:$('durationRange'), durationVal:$('durationVal'), exportScale:$('exportScale'), exportScaleVal:$('exportScaleVal'), includeAudioBtn:$('includeAudioBtn'), invertBtn:$('invertBtn'), fitBtn:$('fitBtn'), parallaxResetBtn:$('parallaxResetBtn'), mediaTimeWrap:$('mediaTimeWrap'), mediaTime:$('mediaTime'), mediaTimeVal:$('mediaTimeVal'),
+  presetWrap:$('presetWrap'), gradientBarWrap:$('gradientBarWrap'), gradientBar:$('gradientBar'), stopLayer:$('stopLayer'), stopColor:$('stopColor'), stopHex:$('stopHex'), stopPos:$('stopPos'), stopPosNum:$('stopPosNum'), stopPosVal:$('stopPosVal'), stopAlpha:$('stopAlpha'), stopAlphaVal:$('stopAlphaVal'), undoGradientBtn:$('undoGradientBtn'), redoGradientBtn:$('redoGradientBtn'), sourceColorBtn:$('sourceColorBtn'), deleteStopBtn:$('deleteStopBtn'), sortStopsBtn:$('sortStopsBtn'), resetGradientBtn:$('resetGradientBtn'),
+  lumaRange:$('lumaRange'), lumaVal:$('lumaVal'), gammaRange:$('gammaRange'), gammaVal:$('gammaVal'), blendMode:$('blendMode'), blendModeVal:$('blendModeVal'), depthExportBtn:$('depthExportBtn'), settingsExportBtn:$('settingsExportBtn'), perfectLoopBtn:$('perfectLoopBtn')
+};
+const ctx = els.renderCanvas.getContext('2d', {willReadFrequently:true});
+const sourceCanvas = document.createElement('canvas');
+const sourceCtx = sourceCanvas.getContext('2d', {willReadFrequently:true});
+const depthPreviewCanvas = document.createElement('canvas');
+const depthPreviewCtx = depthPreviewCanvas.getContext('2d', {willReadFrequently:true});
+const state = {
+  sourceURL:null, sourceType:null, image:null, video:els.sourceVideo, sourceName:'', cameraStream:null, depthOutput:null, estimatorPromise:null, currentView:'result', invertDepth:false,
+  motionPlaying:false, motionPhase:0, direction:1, motionMode:'wrap', lastFrameTime:0, needsRender:true, selectedStopId:null, activePreset:'aurora', stops:[], recorder:null, chunks:[], recording:false, recordTimer:null, includeAudio:true, exportScale:1, dragStopId:null, dragDelete:false, seekingMedia:false, autoDepthMs:0, autoDepthBusy:false, autoDepthLast:0, colorSpace:'oklab', dither:true, parallax:120, parallaxX:0, parallaxY:0, parallaxTargetX:0, parallaxTargetY:0, parallaxDragging:false, previewZoom:1, fitScale:1, perfectLoop:false, pickSourceColor:false, gradientHistory:[], gradientHistoryIndex:-1, transformersRuntime:null, webglReady:false
+};
+const presets = {
+  aurora:[{pos:0,color:'#081B54'},{pos:30,color:'#00B8A9'},{pos:66,color:'#A7F432'},{pos:100,color:'#F5FFDF'}],
+  infrared:[{pos:0,color:'#1A0038'},{pos:30,color:'#8C00FF'},{pos:65,color:'#FF0055'},{pos:100,color:'#FFD400'}],
+  sunset:[{pos:0,color:'#283593'},{pos:42,color:'#7E57C2'},{pos:72,color:'#FF7043'},{pos:100,color:'#FFE082'}],
+  ocean:[{pos:0,color:'#061B2D'},{pos:45,color:'#0077B6'},{pos:100,color:'#90E0EF'}],
+  candy:[{pos:0,color:'#FF4D6D'},{pos:38,color:'#FFD166'},{pos:70,color:'#4D96FF'},{pos:100,color:'#B8F7D4'}],
+  mono:[{pos:0,color:'#111111'},{pos:48,color:'#999999'},{pos:100,color:'#FFFFFF'}],
+  // Single colour, opacity-only gradients (transparent -> opaque of one hue).
+  fade:[{pos:0,color:'#FFFFFF',alpha:0},{pos:100,color:'#FFFFFF',alpha:1}],
+  shadow:[{pos:0,color:'#000000',alpha:0},{pos:100,color:'#000000',alpha:0.85}],
+  glow:[{pos:0,color:'#FF8A3D',alpha:0},{pos:100,color:'#FF8A3D',alpha:1}]
+};
+function uid(seed=''){return (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${seed}_${Math.random().toString(36).slice(2)}`;}
+function clampAlpha(a){const n=Number(a); return Number.isFinite(n)?clamp(n,0,1):1;}
+function cloneStops(list){return list.map((s,idx)=>({id:uid(idx),pos:Number(s.pos),color:s.color.toUpperCase(),alpha:(s.alpha==null?1:clampAlpha(s.alpha))}));}
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v)); const mix=(a,b,t)=>a+(b-a)*t; const wrap01=v=>((v%1)+1)%1;
+function showToast(message){els.toast.textContent=message; els.toast.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(()=>els.toast.classList.remove('show'),1800);}
+function setStatus(message,isError=false){els.status.innerHTML=message; els.status.classList.toggle('error',isError);} function setProgress(value){els.progressBar.style.width=`${clamp(value,0,100)}%`;}
+function hexToRgb(hex){let h=(hex||'').trim().replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); if(!/^[0-9a-fA-F]{6}$/.test(h)) return [255,255,255]; const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255];}
+function normalizeHex(hex){let h=(hex||'').trim().replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); if(!/^[0-9a-fA-F]{6}$/.test(h)) return null; return '#'+h.toUpperCase();}
+function rgbToHex(rgb){return '#'+rgb.map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('').toUpperCase();}
+function colorMix(c1,c2,t){return [mix(c1[0],c2[0],t),mix(c1[1],c2[1],t),mix(c1[2],c2[2],t)];}
+function resizeToFit(width,height,maxSide){const scale=Math.min(1,maxSide/Math.max(width,height)); return {width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale))};}
+function fmtTime(sec){sec=Math.max(0,Number(sec)||0); const m=Math.floor(sec/60), s=Math.floor(sec%60); return `${m}:${String(s).padStart(2,'0')}`;}
+function applyCanvasQuality(){for(const cctx of [ctx, sourceCtx, depthPreviewCtx]){if(!cctx) continue; cctx.imageSmoothingEnabled=true; cctx.imageSmoothingQuality='high';}}
+function updatePreviewFit(){
+  if(!els.preview || !els.renderCanvas || !els.renderCanvas.width || !els.renderCanvas.height) return;
+  const rect=els.preview.getBoundingClientRect();
+  const pad=28;
+  const availableW=Math.max(80,rect.width-pad);
+  const availableH=Math.max(80,rect.height-pad);
+  state.fitScale=Math.min(availableW/els.renderCanvas.width,availableH/els.renderCanvas.height,1);
+  const zoom=clamp(Number(state.previewZoom)||1,0.08,12);
+  els.renderCanvas.style.width=`${Math.max(1,els.renderCanvas.width*state.fitScale*zoom)}px`;
+  els.renderCanvas.style.height=`${Math.max(1,els.renderCanvas.height*state.fitScale*zoom)}px`;
+  updateParallaxTilt();
+}
+function setCanvasSize(width,height){
+  for(const c of [els.renderCanvas,sourceCanvas,depthPreviewCanvas]){c.width=width;c.height=height;}
+  applyCanvasQuality();
+  updatePreviewFit();
+}
+function updateBadges(){els.mediaBadge.textContent=state.sourceType?state.sourceType.toUpperCase():'No Source'; els.mediaBadge.classList.toggle('on',!!state.sourceType); els.depthBadge.textContent=state.depthOutput?'Depth Ready':'No Depth'; els.depthBadge.classList.toggle('on',!!state.depthOutput); els.motionBadge.textContent=state.motionPlaying?'Motion On':'Motion Off'; els.motionBadge.classList.toggle('on',state.motionPlaying); els.motionStateVal.textContent=state.motionPlaying?'On':'Off';}
+function markRender(){state.needsRender=true;}
+function currentSortedStops(){return [...state.stops].map(s=>({...s,pos:clamp(Number(s.pos),0,100)})).sort((a,b)=>a.pos-b.pos);}
+function colorAtGradient(t){const stops=currentSortedStops(); if(!stops.length) return [255,255,255]; if(stops.length===1) return hexToRgb(stops[0].color); t=clamp(t,0,1); const p=t*100; if(p<=stops[0].pos) return hexToRgb(stops[0].color); if(p>=stops[stops.length-1].pos) return hexToRgb(stops[stops.length-1].color); for(let i=0;i<stops.length-1;i++){const a=stops[i], b=stops[i+1]; if(p>=a.pos && p<=b.pos){const span=Math.max(0.0001,b.pos-a.pos); const local=(p-a.pos)/span; return colorMix(hexToRgb(a.color),hexToRgb(b.color),local);}} return hexToRgb(stops[stops.length-1].color);}
+function colorAtDepth(t, offset){const scale=Number(els.scaleRange.value)/100; let sample; if(state.motionMode==='sine'){sample=0.5+0.5*Math.sin(((t*scale)+offset)*Math.PI*2);} else {sample=wrap01(t*scale+offset);} return colorAtGradient(sample);} 
+function rgbaCss(stop){const c=hexToRgb(stop.color); return `rgba(${c[0]},${c[1]},${c[2]},${clampAlpha(stop.alpha)})`;}
+const GRAD_CHECKER='repeating-conic-gradient(#33363f 0% 25%, #1b1d23 0% 50%) 0 0 / 14px 14px';
+function gradientCss(){const stops=currentSortedStops(); if(!stops.length) return GRAD_CHECKER; const grad=`linear-gradient(90deg, ${stops.map(s=>`${rgbaCss(s)} ${s.pos}%`).join(', ')})`; return `${grad}, ${GRAD_CHECKER}`;}
+function renderPresets(){els.presetWrap.innerHTML=''; Object.entries(presets).forEach(([key,stops])=>{const btn=document.createElement('button'); btn.className='presetBtn'+(state.activePreset===key?' on':''); const sw=document.createElement('span'); sw.className='presetSwatch'; sw.style.background=`linear-gradient(90deg, ${stops.map(s=>`${s.color} ${s.pos}%`).join(', ')})`; const tx=document.createElement('span'); tx.textContent=key[0].toUpperCase()+key.slice(1); btn.append(sw,tx); btn.addEventListener('click',()=>{state.activePreset=key; state.stops=cloneStops(presets[key]); state.selectedStopId=state.stops[0]?.id??null; renderPresets(); renderGradientEditor(); markRender();}); els.presetWrap.append(btn);});}
+function renderGradientEditor(){els.gradientBar.style.background=gradientCss(); els.stopLayer.innerHTML=''; const stops=currentSortedStops(); stops.forEach(stop=>{const h=document.createElement('div'); h.className='stopHandle'+(stop.id===state.selectedStopId?' selected':'')+((state.dragDelete && stop.id===state.dragStopId)?' deleting':''); h.style.left=`${stop.pos}%`; h.style.setProperty('--stop-color',stop.color); h.dataset.id=stop.id; h.addEventListener('pointerdown',event=>{event.preventDefault(); event.stopPropagation(); state.dragStopId=stop.id; state.selectedStopId=stop.id; state.dragDelete=false; h.setPointerCapture(event.pointerId); renderGradientEditor(); updateSelectedStopUI();}); h.addEventListener('click',event=>{event.stopPropagation(); state.selectedStopId=stop.id; renderGradientEditor(); updateSelectedStopUI();}); els.stopLayer.appendChild(h);}); updateSelectedStopUI();}
+function selectedStop(){return state.stops.find(s=>s.id===state.selectedStopId)||state.stops[0]||null;}
+function updateSelectedStopUI(){const stop=selectedStop(); const canDelete=state.stops.length>2; els.deleteStopBtn.disabled=!stop||!canDelete; if(!stop) return; els.stopColor.value=normalizeHex(stop.color)||'#FFFFFF'; els.stopHex.value=normalizeHex(stop.color)||'#FFFFFF'; els.stopPos.value=Math.round(stop.pos); els.stopPosVal.textContent=`${Math.round(stop.pos)}%`;}
+function positionFromBarEvent(event){const rect=els.gradientBar.getBoundingClientRect(); return clamp((event.clientX-rect.left)/Math.max(1,rect.width)*100,0,100);} 
+function addStopAt(pos,color=null){const sampled=color||rgbToHex(colorAtGradient(pos/100)); const stop={id:uid('stop'),pos:clamp(pos,0,100),color:(normalizeHex(sampled)||'#FFFFFF')}; state.stops.push(stop); state.selectedStopId=stop.id; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();}
+function sortStops(){state.stops.sort((a,b)=>a.pos-b.pos); renderGradientEditor(); markRender();}
+function removeSelectedStop(){if(state.stops.length<=2) return; const idx=state.stops.findIndex(s=>s.id===state.selectedStopId); if(idx<0) return; state.stops.splice(idx,1); state.selectedStopId=state.stops[Math.max(0,idx-1)]?.id ?? state.stops[0]?.id ?? null; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();}
+async function stopCamera(){if(state.cameraStream){state.cameraStream.getTracks().forEach(track=>track.stop()); state.cameraStream=null;} if(state.sourceType==='camera'){state.video.pause(); state.video.srcObject=null; state.sourceType=null; state.depthOutput=null; state.image=null; els.mediaPlayBtn.disabled=true; els.estimateBtn.disabled=true; els.reestimateBtn.disabled=true; els.pngBtn.disabled=true; els.recordBtn.disabled=true; els.stopCameraBtn.disabled=true; els.emptyState.classList.remove('hidden'); setStatus('Camera stopped. Choose a new file or start the camera again.'); ctx.clearRect(0,0,els.renderCanvas.width,els.renderCanvas.height);} updateBadges();}
+async function startCamera(){
+  if(!navigator.mediaDevices?.getUserMedia){
+    setStatus('Camera access is unavailable here. Open this file through http://localhost or HTTPS, then allow camera permission.',true);
+    return;
+  }
+  try{
+    await stopCamera();
+    const idealSide=Math.max(720, Math.min(2160, PROCESS_MAX_SIDE));
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:idealSide},height:{ideal:Math.round(idealSide*9/16)}},audio:false});
+    state.cameraStream=stream;
+    const v=state.video;
+    v.srcObject=stream; v.removeAttribute('src'); v.muted=true; v.playsInline=true;
+    await new Promise((resolve,reject)=>{v.onloadedmetadata=()=>resolve(); v.onerror=()=>reject(new Error('Could not start camera.'));});
+    await v.play();
+    let vw=v.videoWidth||0, vh=v.videoHeight||0;
+    for(let i=0;i<10 && (!vw || !vh);i++){
+      await new Promise(r=>setTimeout(r,80));
+      vw=v.videoWidth||vw; vh=v.videoHeight||vh;
+    }
+    vw=vw||1280; vh=vh||720;
+    const size=resizeToFit(vw,vh,PROCESS_MAX_SIDE);
+    setCanvasSize(size.width,size.height);
+    state.image=null; state.sourceType='camera'; state.sourceName='Camera'; state.depthOutput=null;
+    els.emptyState.classList.add('hidden'); els.estimateBtn.disabled=false; els.reestimateBtn.disabled=false; els.mediaPlayBtn.disabled=true; els.pngBtn.disabled=true; els.recordBtn.disabled=true; els.stopCameraBtn.disabled=false; els.mediaTimeWrap.classList.remove('show');
+    els.fileMeta.textContent=`Camera Live · ${vw}×${vh}`;
+    drawSourceFrame();
+    setStatus('Camera ready. Click <b>Estimate Depth</b> to analyze the current camera frame.');
+    updateBadges(); markRender(); showToast('Camera ready');
+  }catch(err){
+    console.error(err);
+    setStatus(`Camera error: ${err.message || err}. Camera requires permission and usually HTTPS or http://localhost.`,true);
+  }
+}
+async function loadImage(file){if(state.sourceURL) URL.revokeObjectURL(state.sourceURL); await stopCamera(); state.sourceURL=URL.createObjectURL(file); const img=new Image(); img.decoding='async'; img.src=state.sourceURL; await img.decode(); const size=resizeToFit(img.naturalWidth,img.naturalHeight,PROCESS_MAX_SIDE); setCanvasSize(size.width,size.height); state.image=img; state.sourceType='image'; state.sourceName=file.name; state.depthOutput=null; state.video.pause(); state.video.srcObject=null; els.emptyState.classList.add('hidden'); els.estimateBtn.disabled=false; els.reestimateBtn.disabled=false; els.mediaPlayBtn.disabled=true; els.pngBtn.disabled=true; els.recordBtn.disabled=true; els.stopCameraBtn.disabled=true; els.mediaTimeWrap.classList.remove('show'); els.fileMeta.textContent=`${file.name} · ${img.naturalWidth}×${img.naturalHeight}`; drawSourceFrame(); setStatus('Image loaded — estimating depth…'); updateBadges(); markRender(); estimateDepth().catch(err=>setStatus(`Depth error: ${err?.message || err}`,true));}
+async function loadVideo(file){if(state.sourceURL) URL.revokeObjectURL(state.sourceURL); await stopCamera(); state.sourceURL=URL.createObjectURL(file); const v=state.video; v.srcObject=null; v.src=state.sourceURL; v.muted=false; v.loop=true; v.playsInline=true; await new Promise((resolve,reject)=>{v.onloadedmetadata=resolve; v.onerror=()=>reject(new Error('Could not load video metadata.'));}); v.currentTime=0; await new Promise(resolve=>{const done=()=>{v.removeEventListener('seeked',done); resolve();}; v.addEventListener('seeked',done); setTimeout(resolve,250);}); const size=resizeToFit(v.videoWidth,v.videoHeight,PROCESS_MAX_SIDE); setCanvasSize(size.width,size.height); state.image=null; state.sourceType='video'; state.sourceName=file.name; state.depthOutput=null; els.emptyState.classList.add('hidden'); els.estimateBtn.disabled=false; els.reestimateBtn.disabled=false; els.mediaPlayBtn.disabled=false; els.pngBtn.disabled=true; els.recordBtn.disabled=true; els.stopCameraBtn.disabled=true; els.mediaTimeWrap.classList.add('show'); els.mediaTime.value=0; updateMediaTimeUI(); els.fileMeta.textContent=`${file.name} · ${v.videoWidth}×${v.videoHeight} · ${fmtTime(v.duration)}`; drawSourceFrame(); setStatus('Video loaded — estimating depth…'); updateBadges(); markRender(); estimateDepth().catch(err=>setStatus(`Depth error: ${err?.message || err}`,true));}
+
+function resetDepthAfterSourceResize(message){
+  state.depthOutput=null;
+  els.pngBtn.disabled=true;
+  els.recordBtn.disabled=true;
+  drawSourceFrame();
+  updateBadges();
+  markRender();
+  if(message) setStatus(message);
+}
+function resizeCurrentSourceForQuality(){
+  if(!state.sourceType) return;
+  let w=0,h=0;
+  if(state.sourceType==='image' && state.image){
+    w=state.image.naturalWidth; h=state.image.naturalHeight;
+  }else if((state.sourceType==='video' || state.sourceType==='camera') && state.video){
+    w=state.video.videoWidth||sourceCanvas.width; h=state.video.videoHeight||sourceCanvas.height;
+  }
+  if(!w || !h) return;
+  const size=resizeToFit(w,h,PROCESS_MAX_SIDE);
+  setCanvasSize(size.width,size.height);
+  resetDepthAfterSourceResize(`Processing resolution changed to ${PROCESS_MAX_SIDE}px. Re-estimate depth for the sharper canvas.`);
+}
+async function autoRefreshDepth(){
+  if(state.sourceType!=='camera' && state.sourceType!=='video') return;
+  try{
+    await estimateDepth({quiet:true});
+  }catch(err){ /* keep the last good depth on a failed live refresh */ }
+}
+
+function handleFiles(files){const file=files?.[0]; if(!file) return; if(file.type.startsWith('image/')) loadImage(file).catch(err=>setStatus(`Image error: ${err.message || err}`,true)); else if(file.type.startsWith('video/')) loadVideo(file).catch(err=>setStatus(`Video error: ${err.message || err}`,true)); else setStatus('Please choose an image or video file.',true);}
+function drawSourceFrame(){if(!state.sourceType) return false; sourceCtx.clearRect(0,0,sourceCanvas.width,sourceCanvas.height); if(state.sourceType==='image' && state.image){sourceCtx.drawImage(state.image,0,0,sourceCanvas.width,sourceCanvas.height); return true;} if((state.sourceType==='video' || state.sourceType==='camera') && state.video.videoWidth){sourceCtx.drawImage(state.video,0,0,sourceCanvas.width,sourceCanvas.height); return true;} return false;}
+function updateMediaTimeUI(){if(state.sourceType!=='video' || !state.video.duration) return; const v=state.video; const ratio=v.currentTime/v.duration; if(!state.seekingMedia) els.mediaTime.value=Math.round(ratio*1000); els.mediaTimeVal.textContent=`${fmtTime(v.currentTime)} / ${fmtTime(v.duration)}`;}
+async function loadTransformersRuntime(){
+  if(state.transformersRuntime) return state.transformersRuntime;
+  setStatus('Loading Transformers.js runtime…');
+  try{
+    const mod = await import('./vendor/transformers.min.js');
+    // Internal / no-external-access build: library, model and wasm are all bundled locally.
+    mod.env.allowLocalModels = true;
+    mod.env.allowRemoteModels = false;
+    mod.env.localModelPath = './models/';
+    if(mod.env.backends?.onnx?.wasm){ mod.env.backends.onnx.wasm.wasmPaths = new URL('vendor/ort/', location.href).href; }
+    state.transformersRuntime = mod;
+    return mod;
+  }catch(err){
+    console.error(err);
+    throw new Error('Could not load the bundled Transformers.js runtime from ./vendor/.');
+  }
+}
+async function getEstimator(){if(state.estimatorPromise) return state.estimatorPromise; state.estimatorPromise=(async()=>{const {pipeline}=await loadTransformersRuntime(); const progress_callback=info=>{if(info.status==='progress'&&Number.isFinite(info.progress)){setProgress(info.progress); setStatus(`Loading depth model… ${Math.round(info.progress)}%`);} else if(info.file){setStatus(`Preparing model… ${info.file}`);}}; return await pipeline('depth-estimation',MODEL_ID,{device:'wasm',dtype:'q8',progress_callback});})(); return state.estimatorPromise;}
+function canvasToBlob(canvas,type='image/png',quality=.92){return new Promise(resolve=>canvas.toBlob(resolve,type,quality));}
+async function estimateDepth(options={}){const quiet=!!options.quiet; if(!state.sourceType) return; if(state.autoDepthBusy) return; state.autoDepthBusy=true; if(!quiet){els.estimateBtn.disabled=true; els.reestimateBtn.disabled=true; els.pngBtn.disabled=true; els.recordBtn.disabled=true; setProgress(0);} try{drawSourceFrame(); const estimator=await getEstimator(); let inputURL=state.sourceURL; let tempURL=null; if(state.sourceType==='video' || state.sourceType==='camera'){const blob=await canvasToBlob(sourceCanvas); tempURL=URL.createObjectURL(blob); inputURL=tempURL;} if(!quiet) setStatus('Estimating depth map from the current source frame…'); const output=await estimator(inputURL); if(tempURL) URL.revokeObjectURL(tempURL); state.depthOutput=output; drawDepthPreview(); if(!quiet) setProgress(100); els.pngBtn.disabled=false; els.recordBtn.disabled=false; if(!quiet) setStatus(state.sourceType==='image' ? 'Depth ready. Adjust the gradient or motion and export PNG/video.' : 'Depth ready. Camera/video frames can move live; depth can be refreshed manually or by the Camera Depth Refresh option.'); if(!quiet) showToast('Depth ready');}catch(err){console.error(err); if(!quiet) setStatus(`Depth error: ${err?.message || err}`,true);}finally{state.autoDepthBusy=false; els.estimateBtn.disabled=false; els.reestimateBtn.disabled=false; updateBadges(); markRender();}}
+function depthValueAt(rawDepth,x,y,dstW,dstH){
+  const fx=((x+0.5)/Math.max(1,dstW))*rawDepth.width-0.5;
+  const fy=((y+0.5)/Math.max(1,dstH))*rawDepth.height-0.5;
+  const x0=clamp(Math.floor(fx),0,rawDepth.width-1), y0=clamp(Math.floor(fy),0,rawDepth.height-1);
+  const x1=clamp(x0+1,0,rawDepth.width-1), y1=clamp(y0+1,0,rawDepth.height-1);
+  const tx=clamp(fx-x0,0,1), ty=clamp(fy-y0,0,1);
+  const d=rawDepth.data, w=rawDepth.width;
+  const a=d[y0*w+x0], b=d[y0*w+x1], c=d[y1*w+x0], e=d[y1*w+x1];
+  return mix(mix(a,b,tx),mix(c,e,tx),ty)/255;
+}
+function adjustedDepthValue(rawValue){let t=rawValue; const contrast=Number(els.contrastRange.value)/100; const gamma=Number(els.gammaRange.value)/100; t=(t-.5)*contrast+.5; t=clamp(t,0,1); t=Math.pow(t,Math.max(.05,gamma)); if(state.invertDepth) t=1-t; return clamp(t,0,1);}
+function drawDepthPreview(){if(!state.depthOutput?.depth) return; const raw=state.depthOutput.depth; const w=sourceCanvas.width, h=sourceCanvas.height; const imageData=depthPreviewCtx.createImageData(w,h); const out=imageData.data; for(let y=0;y<h;y++){for(let x=0;x<w;x++){const rawValue=depthValueAt(raw,x,y,w,h); const v=Math.round(adjustedDepthValue(rawValue)*255); const i=(y*w+x)*4; out[i]=v; out[i+1]=v; out[i+2]=v; out[i+3]=255;}} depthPreviewCtx.putImageData(imageData,0,0);} 
+function blendPixel(src,grad,alpha,mode){const out=[src[0],src[1],src[2]]; if(mode==='normal'){out[0]=mix(src[0],grad[0],alpha); out[1]=mix(src[1],grad[1],alpha); out[2]=mix(src[2],grad[2],alpha); return out;} let blended=grad; if(mode==='screen'){blended=[255-(255-src[0])*(255-grad[0])/255,255-(255-src[1])*(255-grad[1])/255,255-(255-src[2])*(255-grad[2])/255];} else if(mode==='multiply'){blended=[src[0]*grad[0]/255,src[1]*grad[1]/255,src[2]*grad[2]/255];} else if(mode==='overlay'){blended=[0,1,2].map(k=>src[k]<128?2*src[k]*grad[k]/255:255-2*(255-src[k])*(255-grad[k])/255);} out[0]=mix(src[0],blended[0],alpha); out[1]=mix(src[1],blended[1],alpha); out[2]=mix(src[2],blended[2],alpha); return out;}
+function composeResult(){const hasSource=drawSourceFrame(); if(!hasSource) return; const w=sourceCanvas.width, h=sourceCanvas.height; if(els.renderCanvas.width!==w || els.renderCanvas.height!==h) setCanvasSize(w,h); if(state.currentView==='source' || !state.depthOutput?.depth){ctx.clearRect(0,0,w,h); ctx.drawImage(sourceCanvas,0,0); return;} if(state.currentView==='depth'){drawDepthPreview(); ctx.clearRect(0,0,w,h); ctx.drawImage(depthPreviewCanvas,0,0); return;} const raw=state.depthOutput.depth; const source=sourceCtx.getImageData(0,0,w,h); const out=ctx.createImageData(w,h); const alpha=Number(els.blendRange.value)/100; const lumaHold=Number(els.lumaRange.value)/100; const softness=Number(els.softnessRange.value); const offset=wrap01(Number(els.phaseRange.value)/100 + state.motionPhase); const mode=els.blendMode.value; const lutSize=1024; const lut=new Array(lutSize); for(let i=0;i<lutSize;i++) lut[i]=colorAtDepth(i/(lutSize-1), offset);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4; let rawValue=depthValueAt(raw,x,y,w,h); if(softness>0){let sum=rawValue, count=1, r=softness; for(let yy=-r;yy<=r;yy+=r){for(let xx=-r;xx<=r;xx+=r){if(xx===0&&yy===0) continue; const nx=clamp(x+xx,0,w-1), ny=clamp(y+yy,0,h-1); sum+=depthValueAt(raw,nx,ny,w,h); count++;}} rawValue=sum/count;}
+      const t=adjustedDepthValue(rawValue); const grad=lut[Math.round(t*(lutSize-1))]; const src=[source.data[i],source.data[i+1],source.data[i+2]]; let mixed=blendPixel(src,grad,alpha,mode);
+      mixed=[mixed[0]*localShade,mixed[1]*localShade,mixed[2]*localShade]; if(lumaHold>0){const srcLuma=src[0]*.2126+src[1]*.7152+src[2]*.0722; const mixLuma=mixed[0]*.2126+mixed[1]*.7152+mixed[2]*.0722; const ratio=mixLuma>0?srcLuma/mixLuma:1; const held=mixed.map(v=>clamp(v*ratio,0,255)); mixed=[mix(mixed[0],held[0],lumaHold),mix(mixed[1],held[1],lumaHold),mix(mixed[2],held[2],lumaHold)];}
+      out.data[i]=mixed[0]; out.data[i+1]=mixed[1]; out.data[i+2]=mixed[2]; out.data[i+3]=source.data[i+3];
+    }
+  }
+  ctx.putImageData(out,0,0);
+}
+function updateDisplays(){if(els.qualityVal) els.qualityVal.textContent=`${PROCESS_MAX_SIDE}px`; if(els.autoDepthVal) els.autoDepthVal.textContent=state.autoDepthMs>0?`${Math.round(state.autoDepthMs/1000)}s`:'Off'; els.blendVal.textContent=`${els.blendRange.value}%`; els.contrastVal.textContent=`${els.contrastRange.value}%`; els.speedVal.textContent=`${(Number(els.speedRange.value)/100).toFixed(2)} cps`; els.scaleVal.textContent=`${(Number(els.scaleRange.value)/100).toFixed(2)}×`; els.phaseVal.textContent=`${els.phaseRange.value}%`; els.softnessVal.textContent=els.softnessRange.value; els.durationVal.textContent=`${els.durationRange.value}s`; els.exportScaleVal.textContent=`${els.exportScale.value}×`; els.lumaVal.textContent=`${els.lumaRange.value}%`; els.gammaVal.textContent=`${(Number(els.gammaRange.value)/100).toFixed(2)}`; els.blendModeVal.textContent=els.blendMode.options[els.blendMode.selectedIndex]?.textContent||'Normal'; if(els.formatVal) els.formatVal.textContent=els.formatSelect.value==='mp4'?'MP4*':'WebM'; if(els.fpsVal) els.fpsVal.textContent=els.fpsSelect.value;}
+function renderLoop(now){
+  requestAnimationFrame(renderLoop);
+  const dt=state.lastFrameTime?Math.min(.1,(now-state.lastFrameTime)/1000):0;
+  state.lastFrameTime=now;
+  if(state.motionPlaying || state.recording){
+    const speed=Number(els.speedRange.value)/100;
+    state.motionPhase=wrap01(state.motionPhase + dt*speed*state.direction);
+    state.needsRender=true;
+  }
+  if((state.sourceType==='video' || state.sourceType==='camera') && !state.video.paused){
+    if(state.sourceType==='video') updateMediaTimeUI();
+    state.needsRender=true;
+  }
+  // Live depth: keep the gradient tracking moving footage in real time. While a
+  // video/camera is playing we re-estimate depth continuously — one pass at a time,
+  // self-throttled by the in-flight guard inside estimateDepth — so the gradient
+  // stays in sync with the picture. When paused we honour the manual refresh
+  // interval if the user set one.
+  if((state.sourceType==='camera' || state.sourceType==='video') && !state.autoDepthBusy){
+    const playing = state.video.videoWidth && !state.video.paused;
+    if(playing){
+      autoRefreshDepth();
+    }else if(state.autoDepthMs>0 && now-state.autoDepthLast>state.autoDepthMs){
+      state.autoDepthLast=now;
+      autoRefreshDepth();
+    }
+  }
+  const tx=state.parallaxTargetX||0, ty=state.parallaxTargetY||0;
+  const px=state.parallaxX||0, py=state.parallaxY||0;
+  const nx=px+(tx-px)*0.18, ny=py+(ty-py)*0.18;
+  if(Math.abs(nx-px)>0.0004 || Math.abs(ny-py)>0.0004){
+    state.parallaxX=nx;
+    state.parallaxY=ny;
+    updateParallaxTilt();
+    state.needsRender=true;
+  }else{
+    state.parallaxX=tx;
+    state.parallaxY=ty;
+  }
+  if(state.needsRender){
+    composeResult();
+    state.needsRender=false;
+  }
+}
+function setView(view){state.currentView=view; els.viewChips.querySelectorAll('.chip').forEach(btn=>btn.classList.toggle('on',btn.dataset.view===view)); markRender();}
+function toggleMotion(force=null){state.motionPlaying=(force===null)?!state.motionPlaying:!!force; els.motionPlayBtn.innerHTML=state.motionPlaying?'<span class="btnIcon">⏸</span>Pause':'<span class="btnIcon">▶</span>Play'; els.motionPlayBtn.classList.toggle('on',state.motionPlaying); updateBadges(); markRender();}
+async function toggleVideoPlayback(){if(state.sourceType!=='video') return; if(state.video.paused){try{await state.video.play(); els.mediaPlayBtn.innerHTML='<span class="btnIcon">⏸</span>Pause';}catch(err){setStatus(`Playback error: ${err.message || err}`,true);}}else{state.video.pause(); els.mediaPlayBtn.innerHTML='<span class="btnIcon">▶</span>Source';} markRender();}
+
+function currentExportScale(){return Math.max(1,Number(els.exportScale?.value)||1);}
+function exportCanvasResize(scale){
+  const old={w:sourceCanvas.width,h:sourceCanvas.height};
+  if(scale>1){setCanvasSize(Math.round(old.w*scale),Math.round(old.h*scale)); composeResult();}
+  return old;
+}
+function exportCanvasRestore(old, scale){
+  if(scale>1 && old){setCanvasSize(old.w,old.h); composeResult();}
+}
+
+function downloadPNG(){
+  if(!state.sourceType) return;
+  setView('result');
+  const scale=currentExportScale();
+  const old=exportCanvasResize(scale);
+  composeResult();
+  const a=document.createElement('a');
+  a.download=`depth-gradient-motion_${els.renderCanvas.width}x${els.renderCanvas.height}.png`;
+  a.href=els.renderCanvas.toDataURL('image/png');
+  a.click();
+  exportCanvasRestore(old, scale);
+  showToast(`PNG saved ${a.download.replace('depth-gradient-motion_','').replace('.png','')}`);
+}
+function pickRecorderMime(requested){const mp4=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1.42E01E','video/mp4']; const webm=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']; const candidates=requested==='mp4'?[...mp4,...webm]:webm; return candidates.find(type=>window.MediaRecorder&&MediaRecorder.isTypeSupported(type))||'';}
+async function startRecording(){
+  if(!state.sourceType || !state.depthOutput){setStatus('Load a source and estimate depth before exporting video.',true); return;}
+  if(!window.MediaRecorder){setStatus('MediaRecorder is not supported in this browser.',true); return;}
+  if(state.recording){stopRecording(); return;}
+  setView('result');
+  const fps=Number(els.fpsSelect.value)||30;
+  const requested=els.formatSelect.value;
+  const duration=Number(els.durationRange.value)||5;
+  const scale=currentExportScale();
+  const oldSize=exportCanvasResize(scale);
+  const stream=els.renderCanvas.captureStream(fps);
+  if(state.includeAudio && state.sourceType==='video' && typeof state.video.captureStream==='function'){
+    try{const videoStream=state.video.captureStream(); videoStream.getAudioTracks().forEach(track=>stream.addTrack(track));}catch(err){console.warn('Could not attach source audio.',err);}
+  }
+  const mime=pickRecorderMime(requested);
+  let recorder;
+  try{recorder=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:14000000}:{videoBitsPerSecond:14000000});}
+  catch(err){exportCanvasRestore(oldSize,scale); setStatus(`Recorder error: ${err.message || err}`,true); return;}
+  state.recorder=recorder; state.chunks=[]; state.recording=true; toggleMotion(true);
+  recorder.ondataavailable=event=>{if(event.data&&event.data.size) state.chunks.push(event.data);};
+  recorder.onstop=()=>{
+    state.recording=false;
+    clearTimeout(state.recordTimer); state.recordTimer=null;
+    stream.getTracks().forEach(track=>track.stop());
+    const actualType=recorder.mimeType||mime||'video/webm';
+    const ext=actualType.startsWith('video/mp4')?'mp4':'webm';
+    const blob=new Blob(state.chunks,{type:actualType});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`depth-gradient-motion_${els.renderCanvas.width}x${els.renderCanvas.height}.${ext}`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    exportCanvasRestore(oldSize,scale);
+    els.recordBtn.innerHTML='<span class="btnIcon">●</span>Video';
+    showToast(`Saved .${ext}`);
+    if(requested==='mp4' && ext!=='mp4') setStatus('MP4 was not supported by this browser. The recording was saved as WebM instead.');
+    else setStatus(`Video export saved as .${ext}.`);
+    updateBadges();
+  };
+  recorder.start(100);
+  els.recordBtn.innerHTML='<span class="btnIcon">■</span>Stop Export';
+  if(state.sourceType==='video'){
+    try{
+      state.video.currentTime=0;
+      await new Promise(resolve=>{const done=()=>{state.video.removeEventListener('seeked',done); resolve();}; state.video.addEventListener('seeked',done); setTimeout(resolve,250);});
+      await state.video.play();
+      els.mediaPlayBtn.innerHTML='<span class="btnIcon">⏸</span>Pause';
+    }catch(err){console.warn('Could not restart video during recording.',err);}
+  }
+  state.recordTimer=setTimeout(()=>stopRecording(),duration*1000);
+  setStatus(`Recording ${duration}s at ${fps}fps · ${els.renderCanvas.width}×${els.renderCanvas.height}…`);
+  updateBadges();
+}
+function stopRecording(){
+  if(state.recorder && state.recorder.state==='recording'){
+    try{state.recorder.requestData();}catch{}
+    setTimeout(()=>{try{state.recorder.stop();}catch{}},80);
+  }
+}
+
+function bindSectionCollapse(){
+  document.querySelectorAll('.collapseBtn').forEach(btn=>{
+    if(btn.dataset.bound==='1') return;
+    btn.dataset.bound='1';
+    btn.addEventListener('click', ()=>{
+      const target = document.getElementById(btn.dataset.target);
+      if(!target) return;
+      const willCollapse = !target.classList.contains('isCollapsed');
+      target.classList.toggle('isCollapsed', willCollapse);
+      btn.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+      btn.textContent = willCollapse ? '+' : '−';
+    });
+  });
+}
+
+function resetPreviewFit(){
+  state.previewZoom=1;
+  updatePreviewFit();
+  showToast('Fit to screen');
+}
+
+function updateParallaxTilt(){
+  if(!els.renderCanvas) return;
+  // Rotation lives in the orbit camera (GL render); the canvas element only needs
+  // to stay centered so wheel-zoom (width/height scaling) grows from the middle.
+  els.renderCanvas.style.transform='translate(-50%, -50%)';
+}
+function resetParallaxView(){
+  state.parallaxTargetX=0;
+  state.parallaxTargetY=0;
+  state.parallaxX=0;
+  state.parallaxY=0;
+  updateParallaxTilt();
+  markRender();
+  showToast('3D view reset');
+}
+function bindParallaxDrag(){
+  if(!els.preview) return;
+  let drag=null;
+  els.preview.classList.add('parallaxReady');
+  els.preview.addEventListener('pointerdown',event=>{
+    if(event.button!==0) return;
+    if(state.pickSourceColor) return;
+    if(!state.sourceType) return;
+    const tag=(event.target?.tagName||'').toLowerCase();
+    if(tag==='button' || tag==='input' || tag==='select') return;
+    drag={
+      id:event.pointerId,
+      x:event.clientX,
+      y:event.clientY,
+      baseX:state.parallaxTargetX||0,
+      baseY:state.parallaxTargetY||0
+    };
+    state.parallaxDragging=true;
+    els.preview.classList.add('parallaxDragging');
+    try{els.preview.setPointerCapture(event.pointerId);}catch{}
+    event.preventDefault();
+  });
+  els.preview.addEventListener('pointermove',event=>{
+    if(!drag) return;
+    const rect=els.preview.getBoundingClientRect();
+    const dx=(event.clientX-drag.x)/Math.max(1,rect.width);
+    const dy=(event.clientY-drag.y)/Math.max(1,rect.height);
+    // Horizontal drag spins around the vertical axis (unbounded -> full 360deg);
+    // vertical drag tilts up/down (clamped to avoid flipping past the poles).
+    state.parallaxTargetX=drag.baseX + dx*PARALLAX3D.AZ_SENS;
+    state.parallaxTargetY=clamp(drag.baseY + dy*PARALLAX3D.EL_SENS,-PARALLAX3D.EL_LIMIT,PARALLAX3D.EL_LIMIT);
+    markRender();
+    event.preventDefault();
+  });
+  function endDrag(event){
+    if(!drag) return;
+    try{els.preview.releasePointerCapture(drag.id);}catch{}
+    drag=null;
+    state.parallaxDragging=false;
+    els.preview.classList.remove('parallaxDragging');
+  }
+  els.preview.addEventListener('pointerup',endDrag);
+  els.preview.addEventListener('pointercancel',endDrag);
+  els.preview.addEventListener('dblclick',event=>{
+    if(state.pickSourceColor) return;
+    resetParallaxView();
+  });
+  els.preview.addEventListener('wheel',event=>{
+    if(!state.sourceType && !els.renderCanvas.width) return;
+    event.preventDefault();
+    const factor=Math.exp(-event.deltaY*0.0012);
+    state.previewZoom=clamp((Number(state.previewZoom)||1)*factor,0.08,12);
+    els.preview.classList.add('zooming');
+    updatePreviewFit();
+    clearTimeout(els.preview._zoomTimer);
+    els.preview._zoomTimer=setTimeout(()=>els.preview.classList.remove('zooming'),300);
+  },{passive:false});
+  if(window.ResizeObserver){
+    const ro=new ResizeObserver(()=>updatePreviewFit());
+    ro.observe(els.preview);
+  }
+  if(els.parallaxResetBtn) els.parallaxResetBtn.addEventListener('click',resetParallaxView);
+}
+
+function bindEvents(){
+  if(els.uploadBtn && els.fileInput) els.uploadBtn.addEventListener('pointerdown',()=>{els.fileInput.value='';});
+  if(els.fileInput) els.fileInput.addEventListener('click',()=>{els.fileInput.value='';});
+  if(els.fileInput) els.fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+  els.cameraBtn.addEventListener('click',startCamera); els.stopCameraBtn.addEventListener('click',stopCamera);
+  if(els.qualitySelect) els.qualitySelect.addEventListener('change',()=>{PROCESS_MAX_SIDE=Number(els.qualitySelect.value)||2160; updateDisplays(); resizeCurrentSourceForQuality();});
+  if(els.autoDepthSelect) els.autoDepthSelect.addEventListener('change',()=>{state.autoDepthMs=Number(els.autoDepthSelect.value)||0; state.autoDepthLast=0; updateDisplays(); if(state.autoDepthMs>0) showToast('Auto depth refresh on');}); els.estimateBtn.addEventListener('click',estimateDepth); els.reestimateBtn.addEventListener('click',estimateDepth); els.mediaPlayBtn.addEventListener('click',toggleVideoPlayback); els.motionPlayBtn.addEventListener('click',()=>toggleMotion()); els.pngBtn.addEventListener('click',downloadPNG); els.recordBtn.addEventListener('click',startRecording); els.fitBtn.addEventListener('click',resetPreviewFit);
+  els.viewChips.querySelectorAll('.chip').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.view)));
+  [els.blendRange,els.contrastRange,els.speedRange,els.scaleRange,els.phaseRange,els.softnessRange,els.durationRange,els.exportScale,els.lumaRange,els.gammaRange,els.blendMode].forEach(el=>el.addEventListener('input',()=>{updateDisplays(); if(el===els.contrastRange || el===els.gammaRange) drawDepthPreview(); markRender();})); els.fpsSelect.addEventListener('change',updateDisplays); els.formatSelect.addEventListener('change',updateDisplays);
+  els.directionChips.querySelectorAll('.chip').forEach(btn=>btn.addEventListener('click',()=>{state.direction=Number(btn.dataset.dir); els.directionChips.querySelectorAll('.chip').forEach(b=>b.classList.toggle('on',b===btn));}));
+  els.motionModeChips.querySelectorAll('.chip').forEach(btn=>btn.addEventListener('click',()=>{state.motionMode=btn.dataset.mode; els.motionModeChips.querySelectorAll('.chip').forEach(b=>b.classList.toggle('on',b===btn)); markRender();}));
+  els.includeAudioBtn.addEventListener('click',()=>{state.includeAudio=!state.includeAudio; els.includeAudioBtn.classList.toggle('on',state.includeAudio);});
+  els.invertBtn.addEventListener('click',()=>{state.invertDepth=!state.invertDepth; els.invertBtn.classList.toggle('on',state.invertDepth); drawDepthPreview(); markRender();});
+  els.gradientBarWrap.addEventListener('pointermove',event=>{if(!state.dragStopId) return; const stop=state.stops.find(s=>s.id===state.dragStopId); if(!stop) return; const wrapRect=els.gradientBarWrap.getBoundingClientRect(); const threshold=wrapRect.top + wrapRect.height - 10; state.dragDelete=event.clientY>threshold; els.gradientBarWrap.classList.toggle('drop-delete',state.dragDelete); if(!state.dragDelete) stop.pos=positionFromBarEvent(event); state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();});
+  window.addEventListener('pointerup',()=>{if(state.dragStopId){if(state.dragDelete && state.stops.length>2){const idx=state.stops.findIndex(s=>s.id===state.dragStopId); if(idx>=0) state.stops.splice(idx,1); state.selectedStopId=state.stops[Math.max(0,idx-1)]?.id ?? state.stops[0]?.id ?? null; showToast('Stop deleted');} state.dragStopId=null; state.dragDelete=false; els.gradientBarWrap.classList.remove('drop-delete'); sortStops(); renderPresets(); renderGradientEditor(); markRender();}});
+  els.gradientBarWrap.addEventListener('click',event=>{const wrapRect=els.gradientBarWrap.getBoundingClientRect(); const barRect=els.gradientBar.getBoundingClientRect(); if(event.target.closest('.stopHandle')) return; if(event.clientY>barRect.bottom && event.clientY<wrapRect.bottom-2){addStopAt(positionFromBarEvent(event)); showToast('Stop added');}});
+  els.sortStopsBtn.addEventListener('click',sortStops); els.resetGradientBtn.addEventListener('click',()=>{state.activePreset='aurora'; state.stops=cloneStops(presets.aurora); state.selectedStopId=state.stops[0].id; renderPresets(); renderGradientEditor(); markRender();}); els.deleteStopBtn.addEventListener('click',removeSelectedStop);
+  els.stopColor.addEventListener('input',()=>{const stop=selectedStop(); if(!stop) return; stop.color=normalizeHex(els.stopColor.value)||'#FFFFFF'; els.stopHex.value=stop.color; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();});
+  els.stopHex.addEventListener('input',()=>{const stop=selectedStop(); if(!stop) return; const normalized=normalizeHex(els.stopHex.value); if(!normalized) return; stop.color=normalized; els.stopColor.value=normalized; els.stopHex.value=normalized; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();});
+  els.stopHex.addEventListener('blur',()=>{const stop=selectedStop(); if(!stop) return; els.stopHex.value=normalizeHex(els.stopHex.value)||normalizeHex(stop.color)||'#FFFFFF';});
+  els.stopPos.addEventListener('input',()=>{const stop=selectedStop(); if(!stop) return; stop.pos=Number(els.stopPos.value); els.stopPosVal.textContent=`${Math.round(stop.pos)}%`; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();});
+  if(els.stopAlpha){
+    els.stopAlpha.addEventListener('pointerdown',()=>pushGradientHistory('before opacity'));
+    els.stopAlpha.addEventListener('input',()=>{const stop=selectedStop(); if(!stop) return; stop.alpha=clamp(Number(els.stopAlpha.value)/100,0,1); if(els.stopAlphaVal) els.stopAlphaVal.textContent=`${Math.round(stop.alpha*100)}%`; state.activePreset=''; renderPresets(); renderGradientEditor(); markRender();});
+    els.stopAlpha.addEventListener('change',()=>pushGradientHistory('opacity'));
+  }
+  els.mediaTime.addEventListener('input',()=>{if(state.sourceType!=='video' || !state.video.duration) return; state.seekingMedia=true; state.video.currentTime=(Number(els.mediaTime.value)/1000)*state.video.duration; updateMediaTimeUI();}); els.mediaTime.addEventListener('change',()=>{state.seekingMedia=false; drawSourceFrame(); markRender();}); state.video.addEventListener('timeupdate',updateMediaTimeUI); state.video.addEventListener('pause',()=>{if(state.sourceType==='video') els.mediaPlayBtn.innerHTML='<span class="btnIcon">▶</span>Source';}); state.video.addEventListener('play',()=>{if(state.sourceType==='video') els.mediaPlayBtn.innerHTML='<span class="btnIcon">⏸</span>Pause';});
+  function hasDraggedFiles(event){ return !!(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files')); }
+  ['dragenter','dragover'].forEach(ev=>window.addEventListener(ev,event=>{
+    if(!hasDraggedFiles(event)) return;
+    event.preventDefault(); event.stopPropagation();
+    if(event.dataTransfer) event.dataTransfer.dropEffect='copy';
+    els.preview?.classList.add('drag','drop-ready');
+  }, false));
+  ['dragleave','dragend'].forEach(ev=>window.addEventListener(ev,event=>{
+    if(event.target===document || event.target===document.body || event.target===els.preview) els.preview?.classList.remove('drag','drop-ready');
+  }, false));
+  window.addEventListener('drop',event=>{
+    if(!(event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length)) return;
+    event.preventDefault(); event.stopPropagation();
+    els.preview?.classList.remove('drag','drop-ready');
+    handleFiles(event.dataTransfer.files);
+  }, false);
+  window.addEventListener('beforeunload',()=>{if(state.cameraStream) state.cameraStream.getTracks().forEach(track=>track.stop());});}
+
+/* ---- V13 consolidated behavior: history, JSON, depth cache, keyboard, WebGL composite ---- */
+
+function snapshotGradient(){
+  return {
+    stops: state.stops.map(s=>({id:s.id,pos:Number(s.pos),color:normalizeHex(s.color)||'#FFFFFF',alpha:clampAlpha(s.alpha)})),
+    activePreset: state.activePreset || '',
+    selectedStopId: state.selectedStopId || null
+  };
+}
+function sameGradientSnapshot(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
+function pushGradientHistory(reason=''){
+  const snap=snapshotGradient();
+  const current=state.gradientHistory[state.gradientHistoryIndex];
+  if(current && sameGradientSnapshot(current,snap)) return;
+  state.gradientHistory=state.gradientHistory.slice(0,state.gradientHistoryIndex+1);
+  state.gradientHistory.push(snap);
+  if(state.gradientHistory.length>80) state.gradientHistory.shift();
+  state.gradientHistoryIndex=state.gradientHistory.length-1;
+  updateHistoryButtons();
+}
+function applyGradientSnapshot(snap){
+  if(!snap || !Array.isArray(snap.stops)) return;
+  state.stops=snap.stops.map((s,i)=>({id:s.id||uid(i),pos:clamp(Number(s.pos)||0,0,100),color:normalizeHex(s.color)||'#FFFFFF',alpha:(s.alpha==null?1:clampAlpha(s.alpha))}));
+  state.activePreset=snap.activePreset||'';
+  state.selectedStopId=snap.selectedStopId && state.stops.some(s=>s.id===snap.selectedStopId) ? snap.selectedStopId : state.stops[0]?.id;
+  renderPresets();
+  renderGradientEditor();
+  markRender();
+}
+function undoGradient(){
+  if(state.gradientHistoryIndex<=0) return;
+  state.gradientHistoryIndex--;
+  applyGradientSnapshot(state.gradientHistory[state.gradientHistoryIndex]);
+  updateHistoryButtons();
+}
+function redoGradient(){
+  if(state.gradientHistoryIndex>=state.gradientHistory.length-1) return;
+  state.gradientHistoryIndex++;
+  applyGradientSnapshot(state.gradientHistory[state.gradientHistoryIndex]);
+  updateHistoryButtons();
+}
+function updateHistoryButtons(){
+  if(els.undoGradientBtn) els.undoGradientBtn.disabled=state.gradientHistoryIndex<=0;
+  if(els.redoGradientBtn) els.redoGradientBtn.disabled=state.gradientHistoryIndex>=state.gradientHistory.length-1;
+}
+
+function srgb8ToLinear(v){ v/=255; return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4); }
+function linearToSrgb8(v){ v=clamp(v,0,1); const s=v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; return clamp(Math.round(s*255),0,255); }
+function rgb8ToOklab(rgb){
+  const r=srgb8ToLinear(rgb[0]), g=srgb8ToLinear(rgb[1]), b=srgb8ToLinear(rgb[2]);
+  const l=0.4122214708*r+0.5363325363*g+0.0514459929*b;
+  const m=0.2119034982*r+0.6806995451*g+0.1073969566*b;
+  const s=0.0883024619*r+0.2817188376*g+0.6299787005*b;
+  const l_=Math.cbrt(l), m_=Math.cbrt(m), s_=Math.cbrt(s);
+  return [
+    0.2104542553*l_+0.7936177850*m_-0.0040720468*s_,
+    1.9779984951*l_-2.4285922050*m_+0.4505937099*s_,
+    0.0259040371*l_+0.7827717662*m_-0.8086757660*s_
+  ];
+}
+function oklabToRgb8(lab){
+  const L=lab[0], a=lab[1], b=lab[2];
+  const l_=L+0.3963377774*a+0.2158037573*b;
+  const m_=L-0.1055613458*a-0.0638541728*b;
+  const s_=L-0.0894841775*a-1.2914855480*b;
+  const l=l_*l_*l_, m=m_*m_*m_, s=s_*s_*s_;
+  const r= 4.0767416621*l-3.3077115913*m+0.2309699292*s;
+  const g=-1.2684380046*l+2.6097574011*m-0.3413193965*s;
+  const bl=-0.0041960863*l-0.7034186147*m+1.7076147010*s;
+  return [linearToSrgb8(r),linearToSrgb8(g),linearToSrgb8(bl)];
+}
+function interpolateRgb(a,b,t){
+  t=clamp(t,0,1);
+  const mode=els.colorSpaceSelect?.value || state.colorSpace || 'oklab';
+  if(mode==='linear'){
+    const ar=srgb8ToLinear(a[0]), ag=srgb8ToLinear(a[1]), ab=srgb8ToLinear(a[2]);
+    const br=srgb8ToLinear(b[0]), bg=srgb8ToLinear(b[1]), bb=srgb8ToLinear(b[2]);
+    return [linearToSrgb8(mix(ar,br,t)),linearToSrgb8(mix(ag,bg,t)),linearToSrgb8(mix(ab,bb,t))];
+  }
+  if(mode==='oklab'){
+    const A=rgb8ToOklab(a), B=rgb8ToOklab(b);
+    return oklabToRgb8([mix(A[0],B[0],t),mix(A[1],B[1],t),mix(A[2],B[2],t)]);
+  }
+  return [
+    Math.round(mix(a[0],b[0],t)),
+    Math.round(mix(a[1],b[1],t)),
+    Math.round(mix(a[2],b[2],t))
+  ];
+}
+function gradientColorAt(t){
+  const stops=currentSortedStops();
+  if(!stops.length) return [255,255,255];
+  if(stops.length===1) return hexToRgb(stops[0].color);
+  t=clamp(t,0,1);
+  const p=t*100;
+  if(p<=stops[0].pos) return hexToRgb(stops[0].color);
+  if(p>=stops[stops.length-1].pos) return hexToRgb(stops[stops.length-1].color);
+  for(let i=0;i<stops.length-1;i++){
+    const a=stops[i], b=stops[i+1];
+    if(p>=a.pos && p<=b.pos){
+      const span=Math.max(0.0001,b.pos-a.pos);
+      return interpolateRgb(hexToRgb(a.color),hexToRgb(b.color),(p-a.pos)/span);
+    }
+  }
+  return hexToRgb(stops[stops.length-1].color);
+}
+function colorAtGradient(t){ return gradientColorAt(t); }
+
+function renderPresets(){
+  els.presetWrap.innerHTML='';
+  Object.entries(presets).forEach(([key,stops])=>{
+    const btn=document.createElement('button');
+    btn.className='presetBtn'+(state.activePreset===key?' on':'');
+    const sw=document.createElement('span');
+    sw.className='presetSwatch';
+    sw.style.background=`linear-gradient(90deg, ${stops.map(s=>`rgba(${hexToRgb(s.color).join(',')},${s.alpha==null?1:clampAlpha(s.alpha)}) ${s.pos}%`).join(', ')}), ${GRAD_CHECKER}`;
+    const tx=document.createElement('span');
+    tx.textContent=key[0].toUpperCase()+key.slice(1);
+    btn.append(sw,tx);
+    btn.addEventListener('click',()=>{
+      pushGradientHistory('before preset');
+      state.activePreset=key;
+      state.stops=cloneStops(presets[key]);
+      state.selectedStopId=state.stops[0]?.id??null;
+      renderPresets();
+      renderGradientEditor();
+      pushGradientHistory('preset');
+      markRender();
+    });
+    els.presetWrap.append(btn);
+  });
+}
+function renderGradientEditor(){
+  els.gradientBar.style.background=gradientCss();
+  els.stopLayer.innerHTML='';
+  const stops=currentSortedStops();
+  stops.forEach(stop=>{
+    const h=document.createElement('div');
+    h.className='stopHandle'+(stop.id===state.selectedStopId?' selected':'')+((state.dragDelete && stop.id===state.dragStopId)?' deleting':'');
+    h.style.left=`${stop.pos}%`;
+    h.style.setProperty('--stop-color',rgbaCss(stop));
+    h.dataset.id=stop.id;
+    h.title='Drag to move. Drag downward to delete.';
+    h.addEventListener('pointerdown',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      pushGradientHistory('before drag');
+      state.dragStopId=stop.id;
+      state.selectedStopId=stop.id;
+      state.dragDelete=false;
+      h.setPointerCapture(event.pointerId);
+      renderGradientEditor();
+      updateSelectedStopUI();
+    });
+    h.addEventListener('click',event=>{
+      event.stopPropagation();
+      state.selectedStopId=stop.id;
+      renderGradientEditor();
+      updateSelectedStopUI();
+    });
+    els.stopLayer.appendChild(h);
+  });
+  updateSelectedStopUI();
+}
+function updateSelectedStopUI(){
+  const stop=selectedStop();
+  const canDelete=state.stops.length>2;
+  if(els.deleteStopBtn) els.deleteStopBtn.disabled=!stop||!canDelete;
+  if(!stop) return;
+  const hex=normalizeHex(stop.color)||'#FFFFFF';
+  els.stopColor.value=hex;
+  els.stopHex.value=hex;
+  els.stopPos.value=Math.round(stop.pos);
+  if(els.stopPosNum) els.stopPosNum.value=Math.round(stop.pos);
+  els.stopPosVal.textContent=`${Math.round(stop.pos)}%`;
+  if(els.stopAlpha){
+    const ap=Math.round(clampAlpha(stop.alpha)*100);
+    els.stopAlpha.value=ap;
+    if(els.stopAlphaVal) els.stopAlphaVal.textContent=`${ap}%`;
+  }
+}
+function addStopAt(pos,color=null,record=true){
+  if(record) pushGradientHistory('before add stop');
+  const sampled=color||rgbToHex(gradientColorAt(pos/100));
+  const stop={id:uid('stop'),pos:clamp(pos,0,100),color:(normalizeHex(sampled)||'#FFFFFF'),alpha:clampAlpha(gradientAlphaAt(clamp(pos,0,100)/100))};
+  state.stops.push(stop);
+  state.selectedStopId=stop.id;
+  state.activePreset='';
+  renderPresets();
+  renderGradientEditor();
+  if(record) pushGradientHistory('add stop');
+  markRender();
+}
+function sortStops(){
+  pushGradientHistory('before sort');
+  state.stops.sort((a,b)=>a.pos-b.pos);
+  state.activePreset='';
+  renderGradientEditor();
+  pushGradientHistory('sort');
+  markRender();
+}
+function removeSelectedStop(){
+  if(state.stops.length<=2) return;
+  pushGradientHistory('before delete stop');
+  const idx=state.stops.findIndex(s=>s.id===state.selectedStopId);
+  if(idx<0) return;
+  state.stops.splice(idx,1);
+  state.selectedStopId=state.stops[Math.max(0,idx-1)]?.id ?? state.stops[0]?.id ?? null;
+  state.activePreset='';
+  renderPresets();
+  renderGradientEditor();
+  pushGradientHistory('delete stop');
+  markRender();
+}
+
+function buildLutData(size=1024){
+  const data=new Uint8Array(size*4);
+  for(let i=0;i<size;i++){
+    const tpos=i/(size-1);
+    const c=gradientColorAt(tpos);
+    const a=gradientAlphaAt(tpos);
+    const o=i*4;
+    data[o]=clamp(Math.round(c[0]),0,255);
+    data[o+1]=clamp(Math.round(c[1]),0,255);
+    data[o+2]=clamp(Math.round(c[2]),0,255);
+    data[o+3]=clamp(Math.round(a*255),0,255);
+  }
+  return data;
+}
+function getDepthRGBA(raw){
+  if(state._depthRGBA && state._depthRGBA.raw===raw) return state._depthRGBA;
+  const data=new Uint8Array(raw.width*raw.height*4);
+  for(let i=0;i<raw.data.length;i++){
+    const v=raw.data[i];
+    const o=i*4;
+    data[o]=v; data[o+1]=v; data[o+2]=v; data[o+3]=255;
+  }
+  state._depthRGBA={raw,data,width:raw.width,height:raw.height};
+  return state._depthRGBA;
+}
+function createCompositeWebGL(){
+  if(state._glComp) return state._glComp;
+  const canvas=document.createElement('canvas');
+  const gl=canvas.getContext('webgl2',{alpha:true,premultipliedAlpha:false,preserveDrawingBuffer:true});
+  if(!gl){ state._glComp=null; return null; }
+  const vs=`attribute vec2 a_pos; varying vec2 v_uv; void main(){v_uv=a_pos*0.5+0.5; gl_Position=vec4(a_pos,0.0,1.0);}`;
+  const fs=`precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_source;
+uniform sampler2D u_depth;
+uniform sampler2D u_lut;
+uniform vec2 u_resolution;
+uniform float u_blend;
+uniform float u_contrast;
+uniform float u_gamma;
+uniform float u_invert;
+uniform float u_phase;
+uniform float u_scale;
+uniform float u_lumaHold;
+uniform float u_softness;
+uniform float u_dither;
+uniform float u_parallax;
+uniform float u_relief;
+uniform vec2 u_view;
+uniform int u_blendMode;
+uniform int u_motionMode;
+float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453123);}
+float sampleDepth(vec2 uv){
+  vec2 tuv=vec2(uv.x,1.0-uv.y);
+  float d=texture2D(u_depth,tuv).r;
+  if(u_softness>0.0){
+    vec2 px=max(vec2(1.0),vec2(u_softness))/u_resolution;
+    d=(d*4.0+
+      texture2D(u_depth,tuv+vec2(px.x,0.0)).r+
+      texture2D(u_depth,tuv-vec2(px.x,0.0)).r+
+      texture2D(u_depth,tuv+vec2(0.0,px.y)).r+
+      texture2D(u_depth,tuv-vec2(0.0,px.y)).r)/8.0;
+  }
+  return d;
+}
+float adjustDepth(float d){
+  float t=clamp((d-0.5)*u_contrast+0.5,0.0,1.0);
+  t=pow(t,max(0.05,u_gamma));
+  if(u_invert>0.5) t=1.0-t;
+  return clamp(t,0.0,1.0);
+}
+vec3 estimateNormal(vec2 uv){
+  vec2 px=1.0/u_resolution;
+  float dx=adjustDepth(sampleDepth(clamp(uv+vec2(px.x,0.0),0.0,1.0)))-
+           adjustDepth(sampleDepth(clamp(uv-vec2(px.x,0.0),0.0,1.0)));
+  float dy=adjustDepth(sampleDepth(clamp(uv+vec2(0.0,px.y),0.0,1.0)))-
+           adjustDepth(sampleDepth(clamp(uv-vec2(0.0,px.y),0.0,1.0)));
+  return normalize(vec3(-dx*u_relief*115.0, dy*u_relief*115.0, 1.0));
+}
+vec2 parallaxSurfaceUV(vec2 uv, out float outDepth, out float outOcc, out vec3 outNormal){
+  vec2 viewDir=vec2(u_view.x,-u_view.y);
+  float viewLen=length(viewDir);
+  outDepth=adjustDepth(sampleDepth(uv));
+  outOcc=0.0;
+  outNormal=estimateNormal(uv);
+  if(viewLen<0.001 || u_parallax<=0.001) return uv;
+  viewDir/=viewLen;
+
+  // Single heightfield intersection. This is closer to image-based 3D warping
+  // than the previous stacked-layer relief, so it avoids visible repeated copies.
+  float maxShift=min(u_parallax*2.9*viewLen, min(u_resolution.x,u_resolution.y)*0.42);
+  vec2 totalShift=viewDir*maxShift/u_resolution;
+  vec2 start=uv+totalShift*0.50;
+  vec2 stepVec=totalShift/28.0;
+
+  vec2 prevUV=start;
+  float prevDiff=adjustDepth(sampleDepth(clamp(prevUV,0.0,1.0)));
+  vec2 hitUV=start;
+  float hitDepth=prevDiff;
+
+  for(int i=1;i<=28;i++){
+    float layer=float(i)/28.0;
+    vec2 curUV=start-stepVec*float(i);
+    float h=adjustDepth(sampleDepth(clamp(curUV,0.0,1.0)));
+    float diff=h-layer;
+    if(diff<=0.0){
+      float denom=max(abs(prevDiff)+abs(diff),0.0001);
+      float f=abs(prevDiff)/denom;
+      hitUV=mix(prevUV,curUV,f);
+      hitDepth=mix(hitDepth,h,f);
+      break;
+    }
+    prevUV=curUV;
+    prevDiff=diff;
+    hitUV=curUV;
+    hitDepth=h;
+  }
+
+  hitUV=clamp(hitUV,0.0,1.0);
+  outDepth=adjustDepth(sampleDepth(hitUV));
+  outNormal=estimateNormal(hitUV);
+
+  float backD=adjustDepth(sampleDepth(clamp(hitUV-viewDir*maxShift*0.020/u_resolution,0.0,1.0)));
+  float frontD=adjustDepth(sampleDepth(clamp(hitUV+viewDir*maxShift*0.014/u_resolution,0.0,1.0)));
+  outOcc=clamp((backD-outDepth)*1.85 + (outDepth-frontD)*0.55,0.0,1.0);
+  return hitUV;
+}
+vec3 blendMode(vec3 src, vec3 grad){
+  if(u_blendMode==1) return 1.0-(1.0-src)*(1.0-grad);
+  if(u_blendMode==2) return src*grad;
+  if(u_blendMode==3){
+    vec3 low=2.0*src*grad;
+    vec3 high=1.0-2.0*(1.0-src)*(1.0-grad);
+    return mix(low,high,step(vec3(0.5),src));
+  }
+  return grad;
+}
+void main(){
+  vec2 uv=v_uv;
+  float t=adjustDepth(sampleDepth(uv));
+  float signedDepth=(t-0.5)*2.0;
+  float surfaceDepth=0.0;
+  float surfaceOcc=0.0;
+  vec3 surfaceNormal=vec3(0.0,0.0,1.0);
+  vec2 pUv=parallaxSurfaceUV(uv,surfaceDepth,surfaceOcc,surfaceNormal);
+  vec4 src=texture2D(u_source,vec2(pUv.x,1.0-pUv.y));
+
+  vec3 lightDir=normalize(vec3(-u_view.x*0.36,u_view.y*0.36,0.92));
+  float lambert=dot(surfaceNormal,lightDir)*0.5+0.5;
+  float rim=pow(clamp(1.0-dot(surfaceNormal,vec3(0.0,0.0,1.0)),0.0,1.0),1.35);
+  float shade=mix(0.82,1.14,lambert) - surfaceOcc*0.22;
+  src.rgb=clamp(src.rgb*shade + rim*0.045,0.0,1.0);
+  float samplePos = u_motionMode==1 ? 0.5+0.5*sin((t*u_scale+u_phase)*6.28318530718) : fract(t*u_scale+u_phase);
+  vec4 gradT=texture2D(u_lut,vec2(samplePos,0.5));
+  vec3 grad=gradT.rgb;
+  vec3 bm=blendMode(src.rgb,grad);
+  vec3 mixed=mix(src.rgb,bm,u_blend*gradT.a);
+  if(u_lumaHold>0.0){
+    float sl=dot(src.rgb,vec3(0.2126,0.7152,0.0722));
+    float ml=max(dot(mixed,vec3(0.2126,0.7152,0.0722)),0.0001);
+    vec3 held=clamp(mixed*(sl/ml),0.0,1.0);
+    mixed=mix(mixed,held,u_lumaHold);
+  }
+  if(u_dither>0.5){
+    mixed += (hash(gl_FragCoord.xy)-0.5)/255.0;
+  }
+  gl_FragColor=vec4(clamp(mixed,0.0,1.0),src.a);
+}`;
+  function sh(type,src){
+    const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  try{
+    const prog=gl.createProgram();
+    gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs));
+    gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    const buf=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(prog,'a_pos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    function tex(){
+      const t=gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      return t;
+    }
+    const comp={canvas,gl,prog,buf,sourceTex:tex(),depthTex:tex(),lutTex:tex(),u:{}};
+    ['u_source','u_depth','u_lut','u_resolution','u_blend','u_contrast','u_gamma','u_invert','u_phase','u_scale','u_lumaHold','u_softness','u_dither','u_parallax','u_relief','u_view','u_blendMode','u_motionMode'].forEach(n=>comp.u[n]=gl.getUniformLocation(prog,n));
+    state._glComp=comp;
+    return comp;
+  }catch(err){
+    console.warn('WebGL composite disabled:',err);
+    state._glComp=null;
+    return null;
+  }
+}
+function blendModeIndex(mode){
+  return mode==='screen'?1:mode==='multiply'?2:mode==='overlay'?3:0;
+}
+function tryCompositeWebGL(){
+  if(!state.depthOutput?.depth) return false;
+  const raw=state.depthOutput.depth;
+  const w=sourceCanvas.width, h=sourceCanvas.height;
+  const comp=createCompositeWebGL();
+  if(!comp) return false;
+  const {canvas,gl,prog,u}=comp;
+  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; gl.viewport(0,0,w,h); }
+  gl.useProgram(prog);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D,comp.sourceTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,sourceCanvas);
+  gl.uniform1i(u.u_source,0);
+
+  const dep=getDepthRGBA(raw);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D,comp.depthTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,dep.width,dep.height,0,gl.RGBA,gl.UNSIGNED_BYTE,dep.data);
+  gl.uniform1i(u.u_depth,1);
+
+  const lutSize=1024;
+  const lut=buildLutData(lutSize);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D,comp.lutTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,lutSize,1,0,gl.RGBA,gl.UNSIGNED_BYTE,lut);
+  gl.uniform1i(u.u_lut,2);
+
+  const alpha=Number(els.blendRange.value)/100;
+  const contrast=Number(els.contrastRange.value)/100;
+  const gamma=Number(els.gammaRange.value)/100;
+  const offset=wrap01(Number(els.phaseRange.value)/100 + state.motionPhase);
+  gl.uniform2f(u.u_resolution,w,h);
+  gl.uniform1f(u.u_blend,alpha);
+  gl.uniform1f(u.u_contrast,contrast);
+  gl.uniform1f(u.u_gamma,gamma);
+  gl.uniform1f(u.u_invert,state.invertDepth?1:0);
+  gl.uniform1f(u.u_phase,offset);
+  gl.uniform1f(u.u_scale,Number(els.scaleRange.value)/100);
+  gl.uniform1f(u.u_lumaHold,Number(els.lumaRange.value)/100);
+  gl.uniform1f(u.u_softness,Number(els.softnessRange.value));
+  gl.uniform1f(u.u_dither,state.dither?1:0);
+  const pStrength=Number(els.parallaxRange?.value||0);
+  gl.uniform1f(u.u_parallax,pStrength);
+  gl.uniform1f(u.u_relief,1.35);
+  gl.uniform2f(u.u_view,state.parallaxX||0,state.parallaxY||0);
+  gl.uniform1i(u.u_blendMode,blendModeIndex(els.blendMode.value));
+  gl.uniform1i(u.u_motionMode,state.motionMode==='sine'?1:0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(canvas,0,0,w,h);
+  return true;
+}
+function sampleImageData(data,w,h,x,y){
+  x=clamp(Math.round(x),0,w-1); y=clamp(Math.round(y),0,h-1);
+  const i=(y*w+x)*4;
+  return [data[i],data[i+1],data[i+2],data[i+3]];
+}
+function composeResultCPU(){
+  const raw=state.depthOutput.depth;
+  const w=sourceCanvas.width, h=sourceCanvas.height;
+  const source=sourceCtx.getImageData(0,0,w,h);
+  const out=ctx.createImageData(w,h);
+  const alpha=Number(els.blendRange.value)/100;
+  const lumaHold=Number(els.lumaRange.value)/100;
+  const softness=Number(els.softnessRange.value);
+  const offset=wrap01(Number(els.phaseRange.value)/100 + state.motionPhase);
+  const mode=els.blendMode.value;
+  const parallax=Number(els.parallaxRange?.value||0);
+  const viewX=state.parallaxX||0, viewY=state.parallaxY||0;
+  const lutSize=1024;
+  const lut=new Array(lutSize);
+  const lutA=new Array(lutSize);
+  for(let i=0;i<lutSize;i++){ lut[i]=colorAtDepth(i/(lutSize-1), offset); lutA[i]=alphaAtDepth(i/(lutSize-1), offset); }
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      let rawValue=depthValueAt(raw,x,y,w,h);
+      if(softness>0){
+        let sum=rawValue, count=1, r=softness;
+        for(let yy=-r;yy<=r;yy+=r){
+          for(let xx=-r;xx<=r;xx+=r){
+            if(xx===0&&yy===0) continue;
+            sum+=depthValueAt(raw,clamp(x+xx,0,w-1),clamp(y+yy,0,h-1),w,h);
+            count++;
+          }
+        }
+        rawValue=sum/count;
+      }
+      const t=adjustedDepthValue(rawValue);
+      const signed=(t-.5)*2;
+      const hasView=parallax>0 && (Math.abs(viewX)>0.0001 || Math.abs(viewY)>0.0001);
+      let sx=x, sy=y;
+      if(hasView){
+        // Single-surface approximate heightfield warp. No repeated side layers.
+        const maxShift=Math.min(parallax*2.9*Math.hypot(viewX,viewY),Math.min(w,h)*0.42);
+        const vx=viewX/(Math.hypot(viewX,viewY)||1);
+        const vy=viewY/(Math.hypot(viewX,viewY)||1);
+        let hx=x+vx*maxShift*0.50, hy=y-vy*maxShift*0.50;
+        for(let stepI=1; stepI<=14; stepI++){
+          const layer=stepI/14;
+          const qx=x+vx*maxShift*(0.50-stepI/14);
+          const qy=y-vy*maxShift*(0.50-stepI/14);
+          const qd=adjustedDepthValue(depthValueAt(raw,clamp(qx,0,w-1),clamp(qy,0,h-1),w,h));
+          hx=qx; hy=qy;
+          if(qd<=layer) break;
+        }
+        sx=hx; sy=hy;
+      }
+      const src=hasView?sampleImageData(source.data,w,h,sx,sy):[source.data[i],source.data[i+1],source.data[i+2],source.data[i+3]];
+      let localShade=1.0;
+      if(hasView){
+        const dxD=adjustedDepthValue(depthValueAt(raw,clamp(sx+1,0,w-1),sy,w,h))-adjustedDepthValue(depthValueAt(raw,clamp(sx-1,0,w-1),sy,w,h));
+        const dyD=adjustedDepthValue(depthValueAt(raw,sx,clamp(sy+1,0,h-1),w,h))-adjustedDepthValue(depthValueAt(raw,sx,clamp(sy-1,0,h-1),w,h));
+        const lambert=clamp(0.88 - dxD*viewX*6.0 + dyD*viewY*6.0,0.72,1.18);
+        const occ=clamp((adjustedDepthValue(depthValueAt(raw,clamp(sx-viewX*8,0,w-1),clamp(sy+viewY*8,0,h-1),w,h))-t)*0.35,0,0.28);
+        localShade=lambert-occ;
+      }
+      const lutIdx=Math.round(t*(lutSize-1));
+      const grad=lut[lutIdx];
+      const gAlpha=lutA[lutIdx];
+      let mixed=blendPixel(src,grad,alpha*gAlpha,mode);
+      if(lumaHold>0){
+        const srcLuma=src[0]*.2126+src[1]*.7152+src[2]*.0722;
+        const mixLuma=mixed[0]*.2126+mixed[1]*.7152+mixed[2]*.0722;
+        const ratio=mixLuma>0?srcLuma/mixLuma:1;
+        const held=mixed.map(v=>clamp(v*ratio,0,255));
+        mixed=[mix(mixed[0],held[0],lumaHold),mix(mixed[1],held[1],lumaHold),mix(mixed[2],held[2],lumaHold)];
+      }
+      if(state.dither){
+        const n=((x*17+y*131)%256)/255-.5;
+        mixed=[mixed[0]+n,mixed[1]+n,mixed[2]+n];
+      }
+      out.data[i]=mixed[0]; out.data[i+1]=mixed[1]; out.data[i+2]=mixed[2]; out.data[i+3]=src[3];
+    }
+  }
+  ctx.putImageData(out,0,0);
+}
+/* ---- V20: genuine depth-displaced 3D mesh parallax ----
+   Replaces the flat plane-tilt + single-surface warp with a real displaced
+   triangle mesh rendered through a perspective camera. The mouse drag moves the
+   camera (with a gentle orbit toward the focus plane) so near geometry slides
+   over far geometry with real occlusion via the depth buffer. Colour / gradient /
+   motion compositing is unchanged and happens in the mesh fragment shader. */
+function mat4Perspective(fovy, aspect, near, far){
+  const f=1/Math.tan(fovy/2), nf=1/(near-far);
+  return new Float32Array([
+    f/aspect,0,0,0,
+    0,f,0,0,
+    0,0,(far+near)*nf,-1,
+    0,0,2*far*near*nf,0
+  ]);
+}
+function mat4Ortho(left,right,bottom,top,near,far){
+  const lr=1/(left-right), bt=1/(bottom-top), nf=1/(near-far);
+  return new Float32Array([
+    -2*lr,0,0,0,
+    0,-2*bt,0,0,
+    0,0,2*nf,0,
+    (left+right)*lr,(top+bottom)*bt,(far+near)*nf,1
+  ]);
+}
+// Smallest ortho half-height that keeps the displaced plane's bounding box framed
+// at every rotation (orthographic: no distance/perspective term, so this is exact
+// and constant per aspect+displacement). OW is then OH*aspect to match the viewport.
+function solveOrthoHalfHeight(aspect, disp, elLimit){
+  const halfW=aspect, halfH=1.0, halfD=0.5*disp;
+  const Rsph=Math.hypot(halfW,halfH,halfD), orbitR=(Rsph+1.0)*2.0;
+  const corners=[];
+  for(const sx of [-1,1]) for(const sy of [-1,1]) for(const sz of [-1,1]) corners.push([sx*halfW,sy*halfH,sz*halfD]);
+  let mX=0,mY=0;
+  for(let ai=0;ai<48;ai++){
+    const az=ai/48*2*Math.PI;
+    for(let ei=-6;ei<=6;ei++){
+      const el=ei/6*elLimit, ce=Math.cos(el), se=Math.sin(el);
+      const m=mat4LookAt([orbitR*ce*Math.sin(az),orbitR*se,orbitR*ce*Math.cos(az)],[0,0,0],[0,1,0]);
+      for(const p of corners){
+        const x=Math.abs(m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12]);
+        const y=Math.abs(m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13]);
+        if(x>mX) mX=x;
+        if(y>mY) mY=y;
+      }
+    }
+  }
+  return Math.max(mY, mX/aspect)*PARALLAX3D.MARGIN;
+}
+function mat4LookAt(eye, center, up){
+  const ex=eye[0],ey=eye[1],ez=eye[2];
+  let zx=ex-center[0], zy=ey-center[1], zz=ez-center[2];
+  let zl=Math.hypot(zx,zy,zz)||1; zx/=zl; zy/=zl; zz/=zl;
+  let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+  let xl=Math.hypot(xx,xy,xz)||1; xx/=xl; xy/=xl; xz/=xl;
+  const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  return new Float32Array([
+    xx,yx,zx,0,
+    xy,yy,zy,0,
+    xz,yz,zz,0,
+    -(xx*ex+xy*ey+xz*ez),-(yx*ex+yy*ey+yz*ez),-(zx*ex+zy*ey+zz*ez),1
+  ]);
+}
+function mat4Mul(a,b){
+  const o=new Float32Array(16);
+  for(let c=0;c<4;c++){
+    for(let r=0;r<4;r++){
+      o[c*4+r]=a[0*4+r]*b[c*4]+a[1*4+r]*b[c*4+1]+a[2*4+r]*b[c*4+2]+a[3*4+r]*b[c*4+3];
+    }
+  }
+  return o;
+}
+// Largest |NDC| reached by the displaced plane's bounding box across a full
+// azimuth sweep and the allowed elevation range, at a given camera distance.
+function maxBoxNDC(fovy, aspect, disp, orbitR, elLimit){
+  const halfW=aspect, halfH=1.0, halfD=0.5*disp;
+  const Rsph=Math.hypot(halfW,halfH,halfD);
+  const near=Math.max(0.05,orbitR-Rsph-0.5), far=orbitR+Rsph+1.0;
+  const proj=mat4Perspective(fovy,aspect,near,far);
+  const corners=[];
+  for(const sx of [-1,1]) for(const sy of [-1,1]) for(const sz of [-1,1]) corners.push([sx*halfW,sy*halfH,sz*halfD]);
+  let mn=0;
+  for(let ai=0;ai<18;ai++){
+    const az=ai/18*2*Math.PI;
+    for(let ei=-2;ei<=2;ei++){
+      const el=ei/2*elLimit, ce=Math.cos(el), se=Math.sin(el);
+      const view=mat4LookAt([orbitR*ce*Math.sin(az),orbitR*se,orbitR*ce*Math.cos(az)],[0,0,0],[0,1,0]);
+      const m=mat4Mul(proj,view);
+      for(const c of corners){
+        const x=m[0]*c[0]+m[4]*c[1]+m[8]*c[2]+m[12];
+        const y=m[1]*c[0]+m[5]*c[1]+m[9]*c[2]+m[13];
+        const w=m[3]*c[0]+m[7]*c[1]+m[11]*c[2]+m[15];
+        if(w>0.0001){ mn=Math.max(mn,Math.abs(x/w),Math.abs(y/w)); }
+      }
+    }
+  }
+  return mn;
+}
+// Smallest camera distance that keeps the whole relief on screen at every
+// rotation (binary search; ~0.97 leaves a hair of safety margin).
+function solveOrbitRadius(fovy, aspect, disp, elLimit){
+  const Rsph=Math.hypot(aspect,1.0,0.5*disp);
+  let hi=Rsph/Math.sin(Math.min(fovy/2,Math.atan(Math.tan(fovy/2)*aspect)))*1.35;
+  let lo=Rsph*0.55;
+  for(let it=0;it<20;it++){
+    const mid=(lo+hi)/2;
+    if(maxBoxNDC(fovy,aspect,disp,mid,elLimit)>0.97) lo=mid; else hi=mid;
+  }
+  return hi;
+}
+const PARALLAX3D={FOVY:30*Math.PI/180,MARGIN:1.015,DISP_MAX:0.95,AZ_SENS:5.4,EL_SENS:3.2,EL_LIMIT:1.15,TEAR:0.085,GRID:176};
+// Rebuild the triangle index list, dropping any quad that straddles a large depth
+// discontinuity. This removes the stretched "spike" triangles between a near
+// object and the far background, so the relief reads as cleanly separated layers
+// when orbited instead of a torn rubber sheet.
+function rebuildCulledIndices(comp, raw){
+  const gl=comp.gl, gridN=comp.gridN, stride=gridN+1;
+  const tv=new Float32Array(stride*stride);
+  for(let j=0;j<stride;j++){
+    for(let i=0;i<stride;i++){
+      tv[j*stride+i]=depthValueAt(raw,i,j,stride,stride);
+    }
+  }
+  const idx=[];
+  const TH=PARALLAX3D.TEAR;
+  for(let j=0;j<gridN;j++){
+    for(let i=0;i<gridN;i++){
+      const a=j*stride+i, b=a+1, c=a+stride, d=c+1;
+      const ta=tv[a],tb=tv[b],tc=tv[c],td=tv[d];
+      const mx=Math.max(ta,tb,tc,td), mn=Math.min(ta,tb,tc,td);
+      if(mx-mn>TH) continue;
+      idx.push(a,c,b, b,c,d);
+    }
+  }
+  const arr=new Uint32Array(idx.length?idx:[0,0,0]);
+  gl.bindVertexArray(comp.vao);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, comp.idxBuf);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  comp.idxCount=arr.length;
+}
+function create3DGL(){
+  if(state._gl3d!==undefined) return state._gl3d;
+  const canvas=document.createElement('canvas');
+  const gl=canvas.getContext('webgl2',{alpha:true,premultipliedAlpha:false,preserveDrawingBuffer:true,antialias:true});
+  if(!gl){ state._gl3d=null; return null; }
+  const vs=`#version 300 es
+precision highp float;
+in vec2 a_uv;
+uniform sampler2D u_depth;
+uniform mat4 u_mvp;
+uniform float u_aspect;
+uniform float u_disp;
+uniform float u_focus;
+uniform float u_contrast;
+uniform float u_gamma;
+uniform float u_invert;
+uniform float u_overscan;
+uniform vec2 u_grid;
+out vec2 v_uv;
+float adj(float d){
+  float t=clamp((d-0.5)*u_contrast+0.5,0.0,1.0);
+  t=pow(t,max(0.05,u_gamma));
+  if(u_invert>0.5) t=1.0-t;
+  return clamp(t,0.0,1.0);
+}
+float sampleD(vec2 uv){
+  vec2 e=1.0/u_grid;
+  float d=textureLod(u_depth,uv,0.0).r*0.4;
+  d+=textureLod(u_depth,clamp(uv+vec2(e.x,0.0),0.0,1.0),0.0).r*0.15;
+  d+=textureLod(u_depth,clamp(uv-vec2(e.x,0.0),0.0,1.0),0.0).r*0.15;
+  d+=textureLod(u_depth,clamp(uv+vec2(0.0,e.y),0.0,1.0),0.0).r*0.15;
+  d+=textureLod(u_depth,clamp(uv-vec2(0.0,e.y),0.0,1.0),0.0).r*0.15;
+  return d;
+}
+void main(){
+  v_uv=a_uv;
+  float d=adj(sampleD(a_uv));
+  float px=(a_uv.x-0.5)*2.0*u_aspect*u_overscan;
+  float py=(0.5-a_uv.y)*2.0*u_overscan;
+  float pz=(d-u_focus)*u_disp;
+  gl_Position=u_mvp*vec4(px,py,pz,1.0);
+}`;
+  const fs=`#version 300 es
+precision highp float;
+precision highp int;
+in vec2 v_uv;
+uniform sampler2D u_source;
+uniform sampler2D u_depth;
+uniform sampler2D u_lut;
+uniform vec2 u_resolution;
+uniform float u_blend;
+uniform float u_contrast;
+uniform float u_gamma;
+uniform float u_invert;
+uniform float u_phase;
+uniform float u_scale;
+uniform float u_lumaHold;
+uniform float u_softness;
+uniform float u_dither;
+uniform float u_shade;
+uniform float u_disp;
+uniform float u_aspect;
+uniform vec2 u_grid;
+uniform int u_blendMode;
+uniform int u_motionMode;
+out vec4 outColor;
+float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453123);}
+float adj(float d){
+  float t=clamp((d-0.5)*u_contrast+0.5,0.0,1.0);
+  t=pow(t,max(0.05,u_gamma));
+  if(u_invert>0.5) t=1.0-t;
+  return clamp(t,0.0,1.0);
+}
+float sampleDepth(vec2 uv){
+  float d=texture(u_depth,uv).r;
+  if(u_softness>0.0){
+    vec2 px=max(vec2(1.0),vec2(u_softness))/u_resolution;
+    d=(d*4.0+
+      texture(u_depth,clamp(uv+vec2(px.x,0.0),0.0,1.0)).r+
+      texture(u_depth,clamp(uv-vec2(px.x,0.0),0.0,1.0)).r+
+      texture(u_depth,clamp(uv+vec2(0.0,px.y),0.0,1.0)).r+
+      texture(u_depth,clamp(uv-vec2(0.0,px.y),0.0,1.0)).r)/8.0;
+  }
+  return d;
+}
+vec3 blendMode(vec3 s, vec3 g){
+  if(u_blendMode==1) return 1.0-(1.0-s)*(1.0-g);
+  if(u_blendMode==2) return s*g;
+  if(u_blendMode==3){
+    vec3 lo=2.0*s*g;
+    vec3 hi=1.0-2.0*(1.0-s)*(1.0-g);
+    return mix(lo,hi,step(vec3(0.5),s));
+  }
+  return g;
+}
+void main(){
+  vec4 src=texture(u_source,v_uv);
+  float t=adj(sampleDepth(v_uv));
+  float samplePos = u_motionMode==1 ? 0.5+0.5*sin((t*u_scale+u_phase)*6.28318530718) : fract(t*u_scale+u_phase);
+  vec4 gradT=texture(u_lut,vec2(samplePos,0.5));
+  vec3 grad=gradT.rgb;
+  vec3 bm=blendMode(src.rgb,grad);
+  vec3 mixed=mix(src.rgb,bm,u_blend*gradT.a);
+  if(u_lumaHold>0.0){
+    float sl=dot(src.rgb,vec3(0.2126,0.7152,0.0722));
+    float ml=max(dot(mixed,vec3(0.2126,0.7152,0.0722)),0.0001);
+    vec3 held=clamp(mixed*(sl/ml),0.0,1.0);
+    mixed=mix(mixed,held,u_lumaHold);
+  }
+  // No shading from displacement: the relief keeps flat, even colour at any
+  // depth or rotation, so applying 3D Surface Depth never casts shadows.
+  if(u_dither>0.5) mixed+=(hash(gl_FragCoord.xy)-0.5)/255.0;
+  outColor=vec4(clamp(mixed,0.0,1.0),src.a);
+}`;
+  function sh(type,source){
+    const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  try{
+    const prog=gl.createProgram();
+    gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs));
+    gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    const gridN=PARALLAX3D.GRID;
+    const stride=gridN+1;
+    const uvArr=new Float32Array(stride*stride*2);
+    let p=0;
+    for(let j=0;j<=gridN;j++){
+      for(let i=0;i<=gridN;i++){
+        uvArr[p++]=i/gridN;
+        uvArr[p++]=j/gridN;
+      }
+    }
+    const idx=new Uint32Array(gridN*gridN*6);
+    let q=0;
+    for(let j=0;j<gridN;j++){
+      for(let i=0;i<gridN;i++){
+        const a=j*stride+i, b=a+1, c=a+stride, d=c+1;
+        idx[q++]=a; idx[q++]=c; idx[q++]=b;
+        idx[q++]=b; idx[q++]=c; idx[q++]=d;
+      }
+    }
+    const vao=gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const uvBuf=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,uvBuf);
+    gl.bufferData(gl.ARRAY_BUFFER,uvArr,gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(prog,'a_uv');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    const idxBuf=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,idxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    function tex(){
+      const t=gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      return t;
+    }
+    const uniforms={};
+    ['u_depth','u_source','u_lut','u_mvp','u_aspect','u_disp','u_focus','u_contrast','u_gamma','u_invert','u_overscan','u_grid','u_resolution','u_blend','u_phase','u_scale','u_lumaHold','u_softness','u_dither','u_shade','u_blendMode','u_motionMode'].forEach(n=>uniforms[n]=gl.getUniformLocation(prog,n));
+    const comp={canvas,gl,prog,vao,idxBuf,sourceTex:tex(),depthTex:tex(),lutTex:tex(),idxCount:idx.length,gridN,u:uniforms,_depthToken:null};
+    state._gl3d=comp;
+    return comp;
+  }catch(err){
+    console.warn('3D mesh parallax disabled:',err);
+    state._gl3d=null;
+    return null;
+  }
+}
+function tryParallax3DWebGL(){
+  if(!state.depthOutput?.depth) return false;
+  if(state._parallax3dForceOff) return false;
+  const raw=state.depthOutput.depth;
+  const w=sourceCanvas.width, h=sourceCanvas.height;
+  const comp=create3DGL();
+  if(!comp) return false;
+  const {canvas,gl,prog,vao,u}=comp;
+  try{
+    if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+    gl.viewport(0,0,w,h);
+    gl.useProgram(prog);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.clearColor(0,0,0,0);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,comp.sourceTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,sourceCanvas);
+    gl.uniform1i(u.u_source,0);
+
+    const dep=getDepthRGBA(raw);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D,comp.depthTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,dep.width,dep.height,0,gl.RGBA,gl.UNSIGNED_BYTE,dep.data);
+    gl.uniform1i(u.u_depth,1);
+
+    // Fully connected mesh: every quad is kept so the relief is watertight with no
+    // gaps. Depth-edge "walls" are darkened in the shader (slope shading) so they
+    // read as solid cliff faces instead of stretched spikes.
+
+    const lutSize=1024;
+    const lut=buildLutData(lutSize);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D,comp.lutTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,lutSize,1,0,gl.RGBA,gl.UNSIGNED_BYTE,lut);
+    gl.uniform1i(u.u_lut,2);
+
+    // ---- Orthographic orbit (turntable) camera ----
+    // parallaxX = azimuth (yaw, unbounded for full 360deg spin),
+    // parallaxY = elevation (pitch, clamped). Orthographic projection means no
+    // perspective distortion: near and far parts of the relief stay the same size.
+    // The ortho frustum is sized analytically from the relief's swept extents so it
+    // never clips against the canvas at any rotation.
+    const aspect=w/h;                       // image/plane aspect (half-width when half-height = 1)
+    const sliderVal=Number(els.parallaxRange?.value||0);
+    const disp=clamp(sliderVal/420,0,1)*PARALLAX3D.DISP_MAX;
+    const halfW=aspect, halfH=1.0, halfD=0.5*disp;
+    const Rsph=Math.hypot(halfW,halfH,halfD);
+    const orbitR=(Rsph+1.0)*2.0;            // any distance works in ortho; just needs to clear near plane
+    const az=state.parallaxX||0;
+    const el=clamp(state.parallaxY||0,-PARALLAX3D.EL_LIMIT,PARALLAX3D.EL_LIMIT);
+    const ce=Math.cos(el), se=Math.sin(el);
+    const eye=[orbitR*ce*Math.sin(az), orbitR*se, orbitR*ce*Math.cos(az)];
+    const view=mat4LookAt(eye,[0,0,0],[0,1,0]);
+    // ---- Orthographic fit ----
+    // Frame to the swept relief box (contain) — exactly the original drag camera —
+    // so tilting keeps the whole relief in view and slides it within the frame
+    // instead of zooming. No MARGIN factor, so at rest (az=el=0) the picture fills
+    // the canvas edge-to-edge with no black border (what export needs) while the
+    // drag/tilt feel stays unchanged.
+    let mX=0,mY=0;
+    for(let sx=-1;sx<=1;sx+=2) for(let sy=-1;sy<=1;sy+=2) for(let sz=-1;sz<=1;sz+=2){
+      const px=sx*halfW, py=sy*halfH, pz=sz*halfD;
+      const cx=Math.abs(view[0]*px+view[4]*py+view[8]*pz+view[12]);
+      const cy=Math.abs(view[1]*px+view[5]*py+view[9]*pz+view[13]);
+      if(cx>mX) mX=cx;
+      if(cy>mY) mY=cy;
+    }
+    const OH=Math.max(mY, mX/aspect);   // ortho half-height (contain; fills at rest)
+    const OW=OH*aspect;                 // ortho half-width (viewport aspect = w/h)
+    const near=Math.max(0.01, orbitR-Rsph-1.0);
+    const far=orbitR+Rsph+1.0;
+    const proj=mat4Ortho(-OW,OW,-OH,OH,near,far);
+    const mvp=mat4Mul(proj,view);
+
+    gl.uniformMatrix4fv(u.u_mvp,false,mvp);
+    gl.uniform1f(u.u_aspect,aspect);
+    gl.uniform1f(u.u_disp,disp);
+    gl.uniform1f(u.u_focus,0.5);
+    gl.uniform1f(u.u_overscan,1.0);
+    gl.uniform2f(u.u_grid,comp.gridN,comp.gridN);
+    gl.uniform2f(u.u_resolution,w,h);
+    gl.uniform1f(u.u_contrast,Number(els.contrastRange.value)/100);
+    gl.uniform1f(u.u_gamma,Number(els.gammaRange.value)/100);
+    gl.uniform1f(u.u_invert,state.invertDepth?1:0);
+    gl.uniform1f(u.u_blend,Number(els.blendRange.value)/100);
+    gl.uniform1f(u.u_phase,wrap01(Number(els.phaseRange.value)/100 + state.motionPhase));
+    gl.uniform1f(u.u_scale,Number(els.scaleRange.value)/100);
+    gl.uniform1f(u.u_lumaHold,Number(els.lumaRange.value)/100);
+    gl.uniform1f(u.u_softness,Number(els.softnessRange.value));
+    gl.uniform1f(u.u_dither,state.dither?1:0);
+    const orbitAmt=clamp(Math.hypot(Math.sin(az)*ce, se),0,1);
+    gl.uniform1f(u.u_shade,clamp(0.04+orbitAmt*0.26,0,0.34));
+    gl.uniform1i(u.u_blendMode,blendModeIndex(els.blendMode.value));
+    gl.uniform1i(u.u_motionMode,state.motionMode==='sine'?1:0);
+
+    gl.bindVertexArray(vao);
+    gl.drawElements(gl.TRIANGLES,comp.idxCount,gl.UNSIGNED_INT,0);
+    gl.bindVertexArray(null);
+    gl.disable(gl.DEPTH_TEST);
+
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(canvas,0,0,w,h);
+    return true;
+  }catch(err){
+    console.warn('3D mesh parallax failed, falling back:',err);
+    state._parallax3dForceOff=true;
+    return false;
+  }
+}
+function composeResult(){
+  const hasSource=drawSourceFrame();
+  if(!hasSource) return;
+  const w=sourceCanvas.width, h=sourceCanvas.height;
+  if(els.renderCanvas.width!==w || els.renderCanvas.height!==h) setCanvasSize(w,h);
+  if(state.currentView==='source' || !state.depthOutput?.depth){
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(sourceCanvas,0,0);
+    return;
+  }
+  if(state.currentView==='depth'){
+    drawDepthPreview();
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(depthPreviewCanvas,0,0);
+    return;
+  }
+  if(!tryParallax3DWebGL() && !tryCompositeWebGL()) composeResultCPU();
+}
+
+function updateDisplays(){
+  if(els.qualityVal) els.qualityVal.textContent=`${PROCESS_MAX_SIDE}px`;
+  if(els.autoDepthVal) els.autoDepthVal.textContent=state.autoDepthMs>0?`${Math.round(state.autoDepthMs/1000)}s`:'Off';
+  if(els.blendVal) els.blendVal.textContent=`${els.blendRange.value}%`;
+  if(els.contrastVal) els.contrastVal.textContent=`${els.contrastRange.value}%`;
+  if(els.speedVal) els.speedVal.textContent=`${(Number(els.speedRange.value)/100).toFixed(2)} cps`;
+  if(els.scaleVal) els.scaleVal.textContent=`${(Number(els.scaleRange.value)/100).toFixed(2)}×`;
+  if(els.phaseVal) els.phaseVal.textContent=`${els.phaseRange.value}%`;
+  if(els.softnessVal) els.softnessVal.textContent=els.softnessRange.value;
+  if(els.durationVal) els.durationVal.textContent=`${els.durationRange.value}s`;
+  if(els.exportScaleVal) els.exportScaleVal.textContent=`${els.exportScale.value}×`;
+  if(els.lumaVal) els.lumaVal.textContent=`${els.lumaRange.value}%`;
+  if(els.gammaVal) els.gammaVal.textContent=`${(Number(els.gammaRange.value)/100).toFixed(2)}`;
+  if(els.blendModeVal) els.blendModeVal.textContent=els.blendMode.options[els.blendMode.selectedIndex]?.textContent||'Normal';
+  if(els.formatVal) els.formatVal.textContent=els.formatSelect.value==='mp4'?'MP4*':'WebM';
+  if(els.fpsVal) els.fpsVal.textContent=els.fpsSelect.value;
+  if(els.parallaxVal) els.parallaxVal.textContent=`${els.parallaxRange.value}px`;
+  if(els.ditherBtn){els.ditherBtn.classList.toggle('on',state.dither); els.ditherBtn.textContent=state.dither?'Banding On':'Banding Off';}
+  if(els.perfectLoopBtn) els.perfectLoopBtn.classList.toggle('on',state.perfectLoop);
+}
+
+function captureSettings(){
+  return {
+    app:'Depth Gradient Motion',
+    version:13,
+    gradient:{
+      activePreset:state.activePreset,
+      stops:state.stops.map(s=>({pos:Number(s.pos),color:normalizeHex(s.color)||'#FFFFFF',alpha:clampAlpha(s.alpha)}))
+    },
+    params:{
+      view:state.currentView,
+      quality:PROCESS_MAX_SIDE,
+      blend:Number(els.blendRange.value),
+      contrast:Number(els.contrastRange.value),
+      luma:Number(els.lumaRange.value),
+      gamma:Number(els.gammaRange.value),
+      blendMode:els.blendMode.value,
+      invertDepth:state.invertDepth,
+      speed:Number(els.speedRange.value),
+      scale:Number(els.scaleRange.value),
+      phase:Number(els.phaseRange.value),
+      softness:Number(els.softnessRange.value),
+      direction:state.direction,
+      motionMode:state.motionMode,
+      autoDepthMs:state.autoDepthMs,
+      colorSpace:els.colorSpaceSelect?.value||'oklab',
+      dither:state.dither,
+      parallax:Number(els.parallaxRange?.value||0),
+      parallaxViewX:state.parallaxTargetX||0,
+      parallaxViewY:state.parallaxTargetY||0,
+      exportFormat:els.formatSelect.value,
+      fps:Number(els.fpsSelect.value),
+      duration:Number(els.durationRange.value),
+      exportScale:Number(els.exportScale.value),
+      includeAudio:state.includeAudio,
+      perfectLoop:state.perfectLoop
+    }
+  };
+}
+function applySettings(obj){
+  if(!obj || !obj.gradient || !Array.isArray(obj.gradient.stops)) throw new Error('Invalid settings file.');
+  pushGradientHistory('before import');
+  state.stops=obj.gradient.stops.map((s,i)=>({id:uid('import'+i),pos:clamp(Number(s.pos)||0,0,100),color:normalizeHex(s.color)||'#FFFFFF',alpha:(s.alpha==null?1:clampAlpha(s.alpha))}));
+  state.activePreset=obj.gradient.activePreset||'';
+  state.selectedStopId=state.stops[0]?.id??null;
+  const p=obj.params||{};
+  const set=(el,v)=>{if(el && v!==undefined && v!==null) el.value=String(v);};
+  if(p.quality){PROCESS_MAX_SIDE=Number(p.quality)||PROCESS_MAX_SIDE; set(els.qualitySelect,PROCESS_MAX_SIDE);}
+  set(els.blendRange,p.blend);
+  set(els.contrastRange,p.contrast);
+  set(els.lumaRange,p.luma);
+  set(els.gammaRange,p.gamma);
+  set(els.blendMode,p.blendMode);
+  set(els.speedRange,p.speed);
+  set(els.scaleRange,p.scale);
+  set(els.phaseRange,p.phase);
+  set(els.softnessRange,p.softness);
+  set(els.autoDepthSelect,p.autoDepthMs);
+  set(els.colorSpaceSelect,p.colorSpace);
+  set(els.parallaxRange,p.parallax ?? 120);
+  state.parallaxTargetX=Number(p.parallaxViewX)||0; state.parallaxTargetY=Number(p.parallaxViewY)||0; state.parallaxX=state.parallaxTargetX; state.parallaxY=state.parallaxTargetY; updateParallaxTilt();
+  set(els.formatSelect,p.exportFormat);
+  set(els.fpsSelect,p.fps);
+  set(els.durationRange,p.duration);
+  set(els.exportScale,p.exportScale);
+  state.invertDepth=!!p.invertDepth;
+  state.direction=Number(p.direction)||1;
+  state.motionMode=p.motionMode==='sine'?'sine':'wrap';
+  state.autoDepthMs=Number(p.autoDepthMs)||0;
+  state.dither=p.dither!==false;
+  state.perfectLoop=!!p.perfectLoop;
+  state.includeAudio=p.includeAudio!==false;
+  state.currentView=p.view||state.currentView;
+  renderPresets();
+  renderGradientEditor();
+  pushGradientHistory("initial");
+  updateDisplays();
+  updateModeChips();
+  pushGradientHistory('import');
+  drawDepthPreview();
+  markRender();
+}
+function updateModeChips(){
+  if(els.directionChips) els.directionChips.querySelectorAll('.chip').forEach(btn=>btn.classList.toggle('on',Number(btn.dataset.dir)===state.direction));
+  if(els.motionModeChips) els.motionModeChips.querySelectorAll('.chip').forEach(btn=>btn.classList.toggle('on',btn.dataset.mode===state.motionMode));
+  if(els.viewChips) els.viewChips.querySelectorAll('.chip').forEach(btn=>btn.classList.toggle('on',btn.dataset.view===state.currentView));
+  if(els.includeAudioBtn) els.includeAudioBtn.classList.toggle('on',state.includeAudio);
+}
+function downloadBlob(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+function exportSettingsJSON(){
+  const blob=new Blob([JSON.stringify(captureSettings(),null,2)],{type:'application/json'});
+  downloadBlob(blob,'depth-gradient-motion-settings.json');
+  showToast('Settings JSON saved');
+}
+async function importSettingsJSON(file){
+  const obj=JSON.parse(await file.text());
+  applySettings(obj);
+  showToast('Settings imported');
+}
+function exportDepthPNG(){
+  if(!state.depthOutput?.depth){setStatus('No depth map to export.',true); return;}
+  const raw=state.depthOutput.depth;
+  const c=document.createElement('canvas');
+  c.width=raw.width; c.height=raw.height;
+  const x=c.getContext('2d');
+  const img=x.createImageData(raw.width,raw.height);
+  for(let i=0;i<raw.data.length;i++){
+    const v=raw.data[i], o=i*4;
+    img.data[o]=v; img.data[o+1]=v; img.data[o+2]=v; img.data[o+3]=255;
+  }
+  x.putImageData(img,0,0);
+  c.toBlob(blob=>downloadBlob(blob,'depth-map.png'),'image/png');
+}
+async function importDepthPNG(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=new Image(); img.decoding='async'; img.src=url; await img.decode();
+    const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+    const x=c.getContext('2d',{willReadFrequently:true});
+    x.drawImage(img,0,0);
+    const id=x.getImageData(0,0,c.width,c.height).data;
+    const data=new Uint8Array(c.width*c.height);
+    for(let i=0,j=0;i<data.length;i++,j+=4) data[i]=id[j];
+    state.depthOutput={depth:{data,width:c.width,height:c.height}};
+    state._depthRGBA=null;
+    drawDepthPreview();
+    els.pngBtn.disabled=false; els.recordBtn.disabled=false;
+    updateBadges();
+    setStatus('Depth map imported. It will be scaled to the current source.');
+    markRender();
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+}
+function sampleSourceColorFromPreview(event){
+  if(!state.pickSourceColor) return;
+  state.pickSourceColor=false;
+  els.preview.classList.remove('pickingColor');
+  if(!drawSourceFrame()){setStatus('No source frame available.',true);return;}
+  const r=els.renderCanvas.getBoundingClientRect();
+  const x=clamp((event.clientX-r.left)/Math.max(1,r.width)*sourceCanvas.width,0,sourceCanvas.width-1);
+  const y=clamp((event.clientY-r.top)/Math.max(1,r.height)*sourceCanvas.height,0,sourceCanvas.height-1);
+  const p=sourceCtx.getImageData(Math.floor(x),Math.floor(y),1,1).data;
+  const hex=rgbToHex([p[0],p[1],p[2]]);
+  const pos=selectedStop()?Number(selectedStop().pos):50;
+  addStopAt(pos,hex,true);
+  setStatus(`Sampled ${hex} from source.`);
+}
+function exportCanvasResize(scale){
+  const old={w:sourceCanvas.width,h:sourceCanvas.height};
+  if(scale>1){setCanvasSize(Math.round(old.w*scale),Math.round(old.h*scale)); composeResult();}
+  return old;
+}
+function exportCanvasRestore(old, scale){
+  if(scale>1 && old){setCanvasSize(old.w,old.h); composeResult();}
+}
+function currentExportScale(){return Math.max(1,Number(els.exportScale?.value)||1);}
+function downloadPNG(){
+  if(!state.sourceType) return;
+  setView('result');
+  const scale=currentExportScale();
+  const old=exportCanvasResize(scale);
+  composeResult();
+  const a=document.createElement('a');
+  a.download=`depth-gradient-motion_${els.renderCanvas.width}x${els.renderCanvas.height}.png`;
+  a.href=els.renderCanvas.toDataURL('image/png');
+  a.click();
+  exportCanvasRestore(old,scale);
+  showToast(`PNG saved ${a.download.replace('depth-gradient-motion_','').replace('.png','')}`);
+}
+async function startRecording(){
+  if(!state.sourceType || !state.depthOutput){setStatus('Load a source and estimate depth before exporting video.',true); return;}
+  if(!window.MediaRecorder){setStatus('MediaRecorder is not supported in this browser.',true); return;}
+  if(state.recording){stopRecording(); return;}
+  setView('result');
+  const fps=Number(els.fpsSelect.value)||30;
+  const requested=els.formatSelect.value;
+  let duration=Number(els.durationRange.value)||5;
+  const speed=Math.max(0.0001,Number(els.speedRange.value)/100);
+  if(state.perfectLoop){
+    const cycles=Math.max(1,Math.round(duration*speed));
+    duration=cycles/speed;
+    setStatus(`Perfect loop: ${cycles} cycle${cycles>1?'s':''} · ${duration.toFixed(2)}s`);
+  }
+  const scale=currentExportScale();
+  const oldSize=exportCanvasResize(scale);
+  const stream=els.renderCanvas.captureStream(fps);
+  if(state.includeAudio && state.sourceType==='video' && typeof state.video.captureStream==='function'){
+    try{const videoStream=state.video.captureStream(); videoStream.getAudioTracks().forEach(track=>stream.addTrack(track));}catch(err){console.warn('Could not attach source audio.',err);}
+  }
+  const mime=pickRecorderMime(requested);
+  let recorder;
+  try{recorder=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:14000000}:{videoBitsPerSecond:14000000});}
+  catch(err){exportCanvasRestore(oldSize,scale); setStatus(`Recorder error: ${err.message || err}`,true); return;}
+  state.recorder=recorder; state.chunks=[]; state.recording=true; toggleMotion(true);
+  recorder.ondataavailable=event=>{if(event.data&&event.data.size) state.chunks.push(event.data);};
+  recorder.onstop=()=>{
+    state.recording=false;
+    clearTimeout(state.recordTimer); state.recordTimer=null;
+    stream.getTracks().forEach(track=>track.stop());
+    const actualType=recorder.mimeType||mime||'video/webm';
+    const ext=actualType.startsWith('video/mp4')?'mp4':'webm';
+    const outW=els.renderCanvas.width, outH=els.renderCanvas.height;
+    const blob=new Blob(state.chunks,{type:actualType});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`depth-gradient-motion_${outW}x${outH}.${ext}`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    exportCanvasRestore(oldSize,scale);
+    els.recordBtn.innerHTML='<span class="btnIcon">●</span>Video';
+    showToast(`Saved .${ext}`);
+    if(requested==='mp4' && ext!=='mp4') setStatus('MP4 was not supported by this browser. Saved as WebM.');
+    else setStatus(`Video export saved as .${ext}.`);
+    updateBadges();
+  };
+  recorder.start(100);
+  els.recordBtn.innerHTML='<span class="btnIcon">■</span>Stop';
+  if(state.sourceType==='video'){
+    try{
+      state.video.currentTime=0;
+      await new Promise(resolve=>{const done=()=>{state.video.removeEventListener('seeked',done); resolve();}; state.video.addEventListener('seeked',done); setTimeout(resolve,250);});
+      await state.video.play();
+      els.mediaPlayBtn.innerHTML='<span class="btnIcon">⏸</span>Pause';
+    }catch(err){console.warn('Could not restart video during recording.',err);}
+  }
+  state.recordTimer=setTimeout(()=>stopRecording(),duration*1000);
+  if(!state.perfectLoop) setStatus(`Recording ${duration}s at ${fps}fps · ${els.renderCanvas.width}×${els.renderCanvas.height}…`);
+  updateBadges();
+}
+
+function bindRangeDefaults(){
+  document.querySelectorAll('input[type=range][data-default]').forEach(el=>{
+    el.addEventListener('dblclick',()=>{
+      el.value=el.dataset.default;
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      showToast('Reset to default');
+    });
+  });
+}
+function bindKeyboardShortcuts(){
+  window.addEventListener('keydown',event=>{
+    const tag=(event.target?.tagName||'').toLowerCase();
+    if(tag==='input' || tag==='textarea' || tag==='select' || event.target?.isContentEditable) return;
+    if((event.metaKey||event.ctrlKey) && event.key.toLowerCase()==='z'){
+      event.preventDefault();
+      if(event.shiftKey) redoGradient(); else undoGradient();
+      return;
+    }
+    if((event.metaKey||event.ctrlKey) && event.key.toLowerCase()==='y'){
+      event.preventDefault(); redoGradient(); return;
+    }
+    if(event.code==='Space'){
+      event.preventDefault(); toggleMotion(); return;
+    }
+    if(event.key==='1') setView('source');
+    if(event.key==='2') setView('depth');
+    if(event.key==='3') setView('result');
+  });
+}
+function bindEnhancements(){
+  if(els.gradientBar){
+    els.gradientBar.addEventListener('dblclick',event=>{addStopAt(positionFromBarEvent(event)); showToast('Stop added');});
+  }
+  if(els.undoGradientBtn) els.undoGradientBtn.addEventListener('click',undoGradient);
+  if(els.redoGradientBtn) els.redoGradientBtn.addEventListener('click',redoGradient);
+  if(els.sourceColorBtn) els.sourceColorBtn.addEventListener('click',()=>{
+    if(!state.sourceType){setStatus('Load a source first.',true); return;}
+    state.pickSourceColor=true;
+    els.preview.classList.add('pickingColor');
+    setStatus('Click the preview to sample a source color into the gradient.');
+  });
+  els.preview.addEventListener('click',sampleSourceColorFromPreview);
+  if(els.stopPosNum) els.stopPosNum.addEventListener('change',()=>{
+    const stop=selectedStop(); if(!stop) return;
+    pushGradientHistory('before numeric stop position');
+    stop.pos=clamp(Number(els.stopPosNum.value)||0,0,100);
+    els.stopPosNum.value=Math.round(stop.pos);
+    state.activePreset='';
+    renderPresets(); renderGradientEditor();
+    pushGradientHistory('numeric stop position');
+    markRender();
+  });
+  [els.stopColor,els.stopHex,els.stopPos].forEach(el=>{
+    if(!el) return;
+    el.addEventListener('pointerdown',()=>pushGradientHistory('before edit'));
+    el.addEventListener('focus',()=>pushGradientHistory('before edit'));
+    el.addEventListener('change',()=>pushGradientHistory('edit'));
+  });
+  if(els.resetGradientBtn) els.resetGradientBtn.addEventListener('click',()=>pushGradientHistory('reset gradient'));
+  if(els.colorSpaceSelect) els.colorSpaceSelect.addEventListener('change',()=>{state.colorSpace=els.colorSpaceSelect.value; markRender();});
+  if(els.ditherBtn) els.ditherBtn.addEventListener('click',()=>{state.dither=!state.dither; updateDisplays(); markRender();});
+  if(els.parallaxRange) els.parallaxRange.addEventListener('input',()=>{state.parallax=Number(els.parallaxRange.value)||0; updateDisplays(); markRender();});
+  if(els.perfectLoopBtn) els.perfectLoopBtn.addEventListener('click',()=>{state.perfectLoop=!state.perfectLoop; updateDisplays();});
+  if(els.depthExportBtn) els.depthExportBtn.addEventListener('click',exportDepthPNG);
+  if(els.depthImportInput) els.depthImportInput.addEventListener('change',e=>{const f=e.target.files?.[0]; if(f) importDepthPNG(f).catch(err=>setStatus(`Depth import error: ${err.message||err}`,true)); e.target.value='';});
+  if(els.settingsExportBtn) els.settingsExportBtn.addEventListener('click',exportSettingsJSON);
+  if(els.settingsImportInput) els.settingsImportInput.addEventListener('change',e=>{const f=e.target.files?.[0]; if(f) importSettingsJSON(f).catch(err=>setStatus(`Settings import error: ${err.message||err}`,true)); e.target.value='';});
+  bindRangeDefaults();
+  bindKeyboardShortcuts();
+  updateHistoryButtons();
+  updateDisplays();
+}
+
+
+
+/* ---- V15 naming + smooth wrap quality patch ---- */
+function gradientColorAtBase(t){
+  const stops=currentSortedStops();
+  if(!stops.length) return [255,255,255];
+  if(stops.length===1) return hexToRgb(stops[0].color);
+  t=clamp(t,0,1);
+  const p=t*100;
+  if(p<=stops[0].pos) return hexToRgb(stops[0].color);
+  if(p>=stops[stops.length-1].pos) return hexToRgb(stops[stops.length-1].color);
+  for(let i=0;i<stops.length-1;i++){
+    const a=stops[i], b=stops[i+1];
+    if(p>=a.pos && p<=b.pos){
+      const span=Math.max(0.0001,b.pos-a.pos);
+      return interpolateRgb(hexToRgb(a.color),hexToRgb(b.color),(p-a.pos)/span);
+    }
+  }
+  return hexToRgb(stops[stops.length-1].color);
+}
+function gradientColorAtSmoothWrap(t){
+  t=wrap01(t);
+  // Seam smoothing fixes the visible hard line caused when 100% and 0% colors differ.
+  // It cross-fades only around the loop seam; the middle of the gradient stays unchanged.
+  const seam=0.14;
+  const half=seam*0.5;
+  if(t<half || t>1-half){
+    const endColor=gradientColorAtBase(1-half);
+    const startColor=gradientColorAtBase(half);
+    const p=t<half ? (t+half)/seam : (t-(1-half))/seam;
+    return interpolateRgb(endColor,startColor,p);
+  }
+  return gradientColorAtBase(t);
+}
+function gradientColorAt(t){
+  return state.motionMode==='wrap' ? gradientColorAtSmoothWrap(t) : gradientColorAtBase(t);
+}
+function colorAtGradient(t){ return gradientColorAt(t); }
+
+// ---- Gradient opacity (alpha) sampling, parallel to the colour samplers ----
+function stopAlpha(s){return clampAlpha(s.alpha);}
+function gradientAlphaAtBase(t){
+  const stops=currentSortedStops();
+  if(!stops.length) return 1;
+  if(stops.length===1) return stopAlpha(stops[0]);
+  t=clamp(t,0,1);
+  const p=t*100;
+  if(p<=stops[0].pos) return stopAlpha(stops[0]);
+  if(p>=stops[stops.length-1].pos) return stopAlpha(stops[stops.length-1]);
+  for(let i=0;i<stops.length-1;i++){
+    const a=stops[i], b=stops[i+1];
+    if(p>=a.pos && p<=b.pos){
+      const span=Math.max(0.0001,b.pos-a.pos);
+      return mix(stopAlpha(a),stopAlpha(b),(p-a.pos)/span);
+    }
+  }
+  return stopAlpha(stops[stops.length-1]);
+}
+function gradientAlphaAtSmoothWrap(t){
+  t=wrap01(t);
+  const seam=0.14, half=seam*0.5;
+  if(t<half || t>1-half){
+    const e=gradientAlphaAtBase(1-half), s=gradientAlphaAtBase(half);
+    const p=t<half ? (t+half)/seam : (t-(1-half))/seam;
+    return mix(e,s,p);
+  }
+  return gradientAlphaAtBase(t);
+}
+function gradientAlphaAt(t){
+  return state.motionMode==='wrap' ? gradientAlphaAtSmoothWrap(t) : gradientAlphaAtBase(t);
+}
+function alphaAtDepth(t, offset){
+  const scale=Number(els.scaleRange.value)/100;
+  let sample;
+  if(state.motionMode==='sine'){sample=0.5+0.5*Math.sin(((t*scale)+offset)*Math.PI*2);}
+  else {sample=wrap01(t*scale+offset);}
+  return gradientAlphaAt(sample);
+}
+
+function init(){
+  state.stops=cloneStops(presets[state.activePreset]);
+  state.selectedStopId=state.stops[0].id;
+  bindEvents();
+  bindSectionCollapse();
+  bindEnhancements();
+  bindParallaxDrag();
+  renderPresets();
+  renderGradientEditor();
+  updateDisplays();
+  updateBadges();
+  setCanvasSize(960,540);
+  ctx.fillStyle='#050609';
+  ctx.fillRect(0,0,els.renderCanvas.width,els.renderCanvas.height);
+  requestAnimationFrame(renderLoop);
+}
+try{init();}catch(err){
+  console.error('Init error:',err);
+  try{setStatus(`Init error: ${err.message || err}`,true);}catch(e){}
+}
+</script>
+</body>
+</html>

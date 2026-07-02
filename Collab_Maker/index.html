@@ -108,7 +108,7 @@
 
 <div class="app">
   <header dir="rtl">
-    <div class="brand"><b>Collab Maker</b><span style="font-size:10px;color:var(--muted);font-weight:600">v1.1</span><img id="brandLogo" alt="Artlist" style="height:22px;width:auto;display:block"></div>
+    <div class="brand"><b>Collab Maker</b><span style="font-size:10px;color:var(--muted);font-weight:600">v1.2</span><img id="brandLogo" alt="Artlist" style="height:22px;width:auto;display:block"></div>
     <div class="spacer"></div>
     <div class="seg" id="formatSeg" dir="ltr">
       <button data-f="16:9" class="active" title="1920 × 1080 px"><i class="ar" style="width:23px"></i>16:9</button>
@@ -397,7 +397,7 @@ stage.addEventListener("pointerdown",e=>{
 function drawSnaplines(lineX,lineY){ stage.querySelectorAll(".snapline").forEach(n=>n.remove()); const s=state.scale;
   if(lineX!=null){ const d=document.createElement("div"); d.className="snapline v"; d.style.left=lineX*s+"px"; stage.appendChild(d); }
   if(lineY!=null){ const d=document.createElement("div"); d.className="snapline h"; d.style.top=lineY*s+"px"; stage.appendChild(d); } }
-function drawGridMarks(f,s){ const gm=guideSafe(state.format), L2=15, T=1;
+function drawGridMarks(f,s){ const gm=guideSafe(state.format), L2=22, T=1;
   const add=(l,t,w,h)=>{const d=document.createElement("div");d.className="gridline";d.style.cssText=`left:${l}px;top:${t}px;width:${w}px;height:${h}px`;stage.appendChild(d);};
   const X0=gm.mx*s,X1=(f.w-gm.mx)*s,Y0=gm.my*s,Y1=(f.h-gm.my)*s,CX=f.w/2*s,CY=f.h/2*s,W=f.w*s,H=f.h*s;
   const corner=(x,y,dx,dy)=>{ add(dx>0?x:x-L2, y, L2, T); add(dx>0?x:x-T, dy>0?y:y-L2, T, L2); };
